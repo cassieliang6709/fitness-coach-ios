@@ -9,8 +9,18 @@
  */
 
 import { streamCoachTurn, type AIStyle, type CoachRequest } from "./coach";
+import {
+    activePlan,
+    equipmentFromMemories,
+    savePlan,
+    shortlist,
+    validatePlan,
+    type PlanInput,
+} from "./plan";
 
 export interface Env {
+    /** D1: the shared source of truth for both clients. */
+    DB: D1Database;
     /** Anthropic API key. Set via: wrangler secret put ANTHROPIC_API_KEY */
     ANTHROPIC_API_KEY: string;
     /** Shared secret the iOS app sends. Set via: wrangler secret put APP_SHARED_SECRET */
@@ -50,6 +60,17 @@ function isAuthorized(request: Request, env: Env): boolean {
 }
 
 const STYLES: AIStyle[] = ["gentle", "encouraging", "practical"];
+
+/** Rows are keyed by a client-supplied id; no account system yet. */
+async function ensureUser(env: Env, userID: string): Promise<void> {
+    const now = new Date().toISOString();
+    await env.DB.prepare(
+        `INSERT INTO users (id, created_at, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(id) DO NOTHING`
+    )
+        .bind(userID, now, now)
+        .run();
+}
 
 /** Cheap shape check so malformed clients get a 400, not an upstream 400. */
 function validate(payload: CoachRequest): string | null {
@@ -102,7 +123,57 @@ export default {
             const invalid = validate(payload);
             if (invalid) return json({ error: "invalid_request", detail: invalid }, 400);
 
-            return streamCoachTurn(payload, env.ANTHROPIC_API_KEY);
+            const userID = url.searchParams.get("user") ?? "demo";
+            await ensureUser(env, userID);
+
+            // Give the model real movements to pick from, filtered by what the
+            // gym actually has according to the user's equipment memories.
+            payload.shortlist = await shortlist(env, {
+                equipment: equipmentFromMemories(payload.memories ?? []),
+                bodyParts: ["upper legs", "chest", "back", "shoulders", "waist", "cardio"],
+                perBucket: 6,
+            });
+
+            return streamCoachTurn(payload, env.ANTHROPIC_API_KEY, {
+                onPlan: async (plan) => {
+                    const checked = await validatePlan(env, plan);
+                    if (!checked.ok) return { ok: false, reason: checked.reason };
+                    await savePlan(env, userID, checked.plan);
+                    return { ok: true, plan: checked.plan };
+                },
+            });
+        }
+
+        // The catalogue-backed plan endpoints. All of them need a user id so
+        // two clients can look at the same person's data.
+        if (url.pathname === "/plan") {
+            if (!isAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
+            const userID = url.searchParams.get("user");
+            if (!userID) return json({ error: "missing_user" }, 400);
+
+            if (request.method === "GET") {
+                return json({ plan: await activePlan(env, userID) });
+            }
+
+            if (request.method === "POST") {
+                // Direct save — used by clients that generated a plan elsewhere.
+                let body: { plan?: PlanInput };
+                try {
+                    body = (await request.json()) as { plan?: PlanInput };
+                } catch {
+                    return json({ error: "invalid_json" }, 400);
+                }
+                if (!body.plan) return json({ error: "missing_plan" }, 400);
+
+                const checked = await validatePlan(env, body.plan);
+                if (!checked.ok) return json({ error: "invalid_plan", detail: checked.reason }, 400);
+
+                await ensureUser(env, userID);
+                const id = await savePlan(env, userID, checked.plan);
+                return json({ id, plan: await activePlan(env, userID) });
+            }
+
+            return json({ error: "method_not_allowed" }, 405);
         }
 
         return json({ error: "not_found" }, 404);

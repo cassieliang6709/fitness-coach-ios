@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { renderShortlist, type ExerciseRow, type PlanInput, type ValidatedPlan } from "./plan";
 
 /**
  * The coach turn: builds the prompt, calls Claude, streams the reply back as
@@ -27,9 +28,12 @@ export interface CoachState {
 
 export interface CoachRequest {
     style: AIStyle;
-    state: CoachState;
+    /** Absent when the user is just chatting rather than mid-set. */
+    state?: CoachState;
     memories: string[];
     messages: Anthropic.MessageParam[];
+    /** Real rows from the exercise table; the only movements it may use. */
+    shortlist?: ExerciseRow[];
 }
 
 // MARK: - Prompt
@@ -51,6 +55,15 @@ const BASE_SYSTEM = `你是一个健身陪练 Agent，在用户训练过程中�
 - 用户报告任何疼痛或不适时，先降低负荷或替换动作，再继续。
 - 涉及疼痛、受伤、用药或疾病时，明确说明你不是医疗人员，建议就医。不要诊断。
 - 记忆里的伤病信息优先于计划。计划要求做的动作如果和伤病冲突，替换它。
+
+计划规则（重要）：
+- 用户要计划、问今天练什么、想换计划时，【立刻调用 generate_plan】。
+  不要先反问"练多久""想练哪里"——先给一版完整的，用户不满意会自己说要改。
+  反问一句再等用户回答，是错误的行为。
+- 默认排 5-6 个力量动作 + 1 个有氧，60 分钟左右。用户明确说了时间再按时间调。
+- exercise_id 只能从工具描述里那份清单复制，绝不自己编。
+- 记忆里的伤病决定了哪些动作不能排。膝盖有问题就不排跳跃和深蹲类。
+- 只有清单里没有的器械才算没有。
 
 工具规则（重要）：
 - 用户报告任何不适、疼痛、发紧、吃力、动作变形时，你【必须】调用 adjust_weight 或 swap_exercise。
@@ -123,12 +136,49 @@ const TOOLS: Anthropic.ToolUnion[] = [
     },
 ];
 
+/** Only offered when a shortlist is present — no catalogue, no plan tool. */
+function planTool(shortlist: ExerciseRow[]): Anthropic.ToolUnion {
+    return {
+        name: "generate_plan",
+        description:
+            `根据用户的目标、场地、器械和伤病，编排一份训练计划。` +
+            `exercise_id 必须来自下面这份动作库清单，一个字都不能改、不能自己发明动作。\n\n` +
+            `可用动作（id | 名称 | 部位 | 器械）：\n${renderShortlist(shortlist)}`,
+        input_schema: {
+            type: "object",
+            properties: {
+                title: { type: "string", description: "计划名称，如「练腿日」「上肢推日」" },
+                summary: { type: "string", description: "一句话说明这份计划为什么这样排" },
+                items: {
+                    type: "array",
+                    description: "动作列表，按训练顺序",
+                    items: {
+                        type: "object",
+                        properties: {
+                            exercise_id: { type: "string", description: "必须是清单里的 id" },
+                            section: { type: "string", enum: ["warmup", "strength", "cardio"] },
+                            sets: { type: "number", description: "组数，1-10" },
+                            reps: { type: "string", description: "次数，如 12 或 30秒" },
+                            weight_kg: { type: "number", description: "建议重量，自重动作省略" },
+                            note: { type: "string", description: "针对该动作的一句提醒" },
+                        },
+                        required: ["exercise_id", "section", "sets", "reps"],
+                    },
+                },
+            },
+            required: ["title", "items"],
+        },
+    };
+}
+
 // MARK: - Message assembly
 
-function describeState(state: CoachState, memories: string[]): string {
+function describeState(state: CoachState | undefined, memories: string[]): string {
     const lines: string[] = [];
 
-    if (state.phase === "planning") {
+    if (!state) {
+        lines.push("用户现在不在训练中，是在和你对话。");
+    } else if (state.phase === "planning") {
         lines.push(`今天的计划：${state.exercise}（${state.prescription}）`);
         lines.push(
             "用户还没开始训练，正在计划阶段。可以介绍今天练什么、按用户的时间和身体状况调整安排。不要喊口号催他开始。"
@@ -145,7 +195,7 @@ function describeState(state: CoachState, memories: string[]): string {
         }
     }
 
-    if (state.venue) lines.push(`场地：${state.venue}`);
+    if (state?.venue) lines.push(`场地：${state.venue}`);
     lines.push(
         memories.length > 0
             ? `关于这个用户你已经记住的：\n${memories.map((m) => `- ${m}`).join("\n")}`
@@ -182,7 +232,18 @@ function sse(event: string, data: unknown): string {
     return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
-export function streamCoachTurn(request: CoachRequest, apiKey: string): Response {
+export interface CoachHooks {
+    /** Validates + persists a generated plan. Returns what the model is told. */
+    onPlan?: (plan: PlanInput) => Promise<
+        { ok: true; plan: ValidatedPlan } | { ok: false; reason: string }
+    >;
+}
+
+export function streamCoachTurn(
+    request: CoachRequest,
+    apiKey: string,
+    hooks: CoachHooks = {}
+): Response {
     const client = new Anthropic({ apiKey });
     const encoder = new TextEncoder();
 
@@ -200,7 +261,9 @@ export function streamCoachTurn(request: CoachRequest, apiKey: string): Response
                     model: "claude-haiku-4-5",
                     max_tokens: 1024,
                     system: buildSystem(request),
-                    tools: TOOLS,
+                    tools: request.shortlist?.length
+                        ? [...TOOLS, planTool(request.shortlist)]
+                        : TOOLS,
                     messages: request.messages,
                 });
 
@@ -224,10 +287,27 @@ export function streamCoachTurn(request: CoachRequest, apiKey: string): Response
                     return;
                 }
 
+                // generate_plan runs here rather than on the client: the
+                // catalogue and the database both live on this side.
+                const planCalls = message.content.filter(
+                    (b): b is Anthropic.ToolUseBlock =>
+                        b.type === "tool_use" && b.name === "generate_plan"
+                );
+                for (const call of planCalls) {
+                    const result = hooks.onPlan
+                        ? await hooks.onPlan(call.input as PlanInput)
+                        : ({ ok: false, reason: "服务端未启用计划生成" } as const);
+                    if (result.ok) {
+                        send("plan", result.plan);
+                    } else {
+                        send("plan_error", { reason: result.reason });
+                    }
+                }
+
                 // Tool inputs are only complete on the final message — emit them
                 // after the text so the app applies a settled payload.
                 for (const block of message.content) {
-                    if (block.type === "tool_use") {
+                    if (block.type === "tool_use" && block.name !== "generate_plan") {
                         send("action", {
                             id: block.id,
                             name: block.name,

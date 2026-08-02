@@ -5,6 +5,13 @@
   "compatibility_date": "2025-11-01",
   // Required by @anthropic-ai/sdk (it imports node: built-ins).
   "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "fitness-coach",
+      "database_id": "834a2b60-8b35-450d-93ba-58c8a2634434"
+    }
+  ],
   "observability": {
     "enabled": true
   }
