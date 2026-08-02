@@ -28,9 +28,14 @@ final class RealtimeAudioEngine {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
 
-    /// What the engine's graph carries: float32, deinterleaved, 24 kHz.
-    private let graphFormat = AVAudioFormat(
-        standardFormatWithSampleRate: RealtimeWire.sampleRate, channels: 1)!
+    /// What the player node carries: int16, deinterleaved, 24 kHz. Coach audio
+    /// arrives in exactly this format, so it reaches the mixer without a
+    /// conversion step in between that can fail into silence.
+    private let playbackFormat = AVAudioFormat(
+        commonFormat: .pcmFormatInt16,
+        sampleRate: RealtimeWire.sampleRate,
+        channels: 1,
+        interleaved: false)!
 
     /// What the wire carries: int16, interleaved, 24 kHz.
     private let wireFormat = AVAudioFormat(
@@ -66,30 +71,30 @@ final class RealtimeAudioEngine {
 
         let session = AVAudioSession.sharedInstance()
         do {
-            // .voiceChat gives us the echo-cancelled input path and routes to
-            // the speaker rather than the earpiece.
+            // .measurement keeps playback on the media volume and the built-in
+            // speaker. .voiceChat put it on the voice-call path instead, where a
+            // phone whose media volume is up still plays the coach at almost
+            // nothing, and .allowBluetooth handed the route to whatever headset
+            // happened to be paired.
             try session.setCategory(
                 .playAndRecord,
-                mode: .voiceChat,
-                options: [.defaultToSpeaker, .allowBluetooth])
+                mode: .measurement,
+                options: [.duckOthers, .defaultToSpeaker])
             try session.setPreferredSampleRate(RealtimeWire.sampleRate)
             try session.setActive(true, options: [])
         } catch {
             throw Failure.sessionUnavailable(error.localizedDescription)
         }
 
-        // Must happen before the graph is built: toggling voice processing
-        // reconfigures the I/O unit and invalidates existing taps. The
-        // simulator's voice-processing I/O can stop its engine after startup;
-        // it also cannot validate real echo cancellation, so keep the stable
-        // regular I/O path there and reserve voice processing for devices.
-        #if !targetEnvironment(simulator)
-        try? engine.inputNode.setVoiceProcessingEnabled(true)
-        try? engine.outputNode.setVoiceProcessingEnabled(true)
-        #endif
+        // No voice processing on either node. Echo cancellation only earns its
+        // cost when the mic is open while the coach speaks, and capture here is
+        // push-to-talk: `beginSpeaking` stops playback before it installs the
+        // tap, so the speaker is never in the mic's way. Enabling it on the
+        // output node also reconfigures the I/O unit behind the graph, which is
+        // what left devices silent while the simulator stayed fine.
 
         engine.attach(player)
-        engine.connect(player, to: engine.mainMixerNode, format: graphFormat)
+        engine.connect(player, to: engine.mainMixerNode, format: playbackFormat)
 
         engine.prepare()
         do {
@@ -239,27 +244,32 @@ final class RealtimeAudioEngine {
     func enqueue(pcm16: Data) {
         guard isRunning, !pcm16.isEmpty else { return }
 
-        let frames = pcm16.count / MemoryLayout<Int16>.size
+        let bytes = pcm16.count - pcm16.count % MemoryLayout<Int16>.size
+        let frames = bytes / MemoryLayout<Int16>.size
         guard frames > 0,
             let buffer = AVAudioPCMBuffer(
-                pcmFormat: graphFormat, frameCapacity: AVAudioFrameCount(frames))
+                pcmFormat: playbackFormat, frameCapacity: AVAudioFrameCount(frames))
         else { return }
         buffer.frameLength = AVAudioFrameCount(frames)
 
-        // Copied through an array rather than read in place: `Data` from base64
-        // carries no alignment guarantee, and loading Int16 from an odd address
-        // is undefined.
-        var samples = [Int16](repeating: 0, count: frames)
-        _ = samples.withUnsafeMutableBytes { pcm16.copyBytes(to: $0) }
-
-        guard let channel = buffer.floatChannelData else { return }
-        for index in 0..<frames {
-            channel[0][index] = Float(Int16(littleEndian: samples[index])) / 32_768
+        // Copied byte-wise rather than as Int16s: `Data` from base64 carries no
+        // alignment guarantee, and the wire is already little-endian int16, so
+        // the bytes need no reinterpretation on the way in.
+        guard let channel = buffer.int16ChannelData else { return }
+        channel[0].withMemoryRebound(to: UInt8.self, capacity: bytes) { destination in
+            _ = pcm16.copyBytes(
+                to: UnsafeMutableBufferPointer(start: destination, count: bytes))
         }
 
         bufferLock.lock()
         scheduledBuffers += 1
         bufferLock.unlock()
+
+        // The node stops itself when a barge-in drains the queue, and a stopped
+        // node accepts buffers without ever sounding them.
+        if !player.isPlaying {
+            player.play()
+        }
 
         player.scheduleBuffer(buffer) { [weak self] in
             guard let self else { return }
