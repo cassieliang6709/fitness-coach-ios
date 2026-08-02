@@ -103,7 +103,7 @@
 		E978E9CEC3D2D0FF70DDD8EF /* WorkoutSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSession.swift; sourceTree = "<group>"; };
 		F181001AD622C3599406E4F1 /* MobileAppShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAppShell.swift; sourceTree = "<group>"; };
 		FB22B9F7B6C288203F121427 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		"TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		"TEMP_BE85B13B-DF76-4F19-B85F-786C83B1A3A0" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -260,10 +260,10 @@
 			path = DesignSystem;
 			sourceTree = "<group>";
 		};
-		"TEMP_224F4EF7-B5B0-4AF0-BCD1-A1806E7F4D34" /* fitness_plan */ = {
+		"TEMP_4B512AB5-9557-425F-9E46-C493F0CCAD11" /* fitness_plan */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */,
+				"TEMP_BE85B13B-DF76-4F19-B85F-786C83B1A3A0" /* Secrets.xcconfig */,
 			);
 			path = fitness_plan;
 			sourceTree = "<group>";
@@ -423,7 +423,7 @@
 /* Begin XCBuildConfiguration section */
 		0A5C1E68088CAA6BC11794C2 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_BE85B13B-DF76-4F19-B85F-786C83B1A3A0" /* Secrets.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGNING_ALLOWED = NO;
@@ -443,7 +443,7 @@
 		};
 		382A8157C0314B540CAE4CDD /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_BE85B13B-DF76-4F19-B85F-786C83B1A3A0" /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -530,7 +530,7 @@
 		};
 		8DD3C532179EBF0A5669FBA8 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_BE85B13B-DF76-4F19-B85F-786C83B1A3A0" /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -554,7 +554,7 @@
 		};
 		A1C0B32022452E30557BDAF4 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_BE85B13B-DF76-4F19-B85F-786C83B1A3A0" /* Secrets.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGNING_ALLOWED = NO;
