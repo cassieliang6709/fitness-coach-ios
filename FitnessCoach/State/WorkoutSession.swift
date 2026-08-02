@@ -160,6 +160,7 @@ final class WorkoutSession {
 
     private static var usesDemoData: Bool {
         let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-live") { return false }
         return arguments.contains("-uitest") || arguments.contains("-onboarded")
             || arguments.contains("-route")
     }
