@@ -59,6 +59,8 @@ welcome flow itself, launch with neither.
 
 ## Web demo (`web/`)
 
+Live: **https://fitness-coach-demo.pages.dev**
+
 For people who can't run an iOS build. All seven routes, same design tokens,
 same `MockData` copy and numbers, same phase machine and scripted coach — no
 build step, no dependencies, no backend.
@@ -67,10 +69,16 @@ build step, no dependencies, no backend.
 open web/index.html
 ```
 
-Deploys as static files (Cloudflare Pages, GitHub Pages, any static host). On a
-desktop it renders inside a phone frame; below 460 px it goes full-bleed. Routes
-are mirrored onto the hash, so `web/index.html#/workout/strength` deep-links the
-same way the app's `-route` flag does.
+Redeploy after a change — three static files, nothing to build:
+
+```bash
+cd worker && npx wrangler pages deploy ../web --project-name=fitness-coach-demo --branch=main
+```
+
+On a desktop it renders inside a phone frame; below 460 px it goes full-bleed.
+Routes are mirrored onto the hash, so
+`fitness-coach-demo.pages.dev/#/workout/strength` deep-links the same way the
+app's `-route` flag does. Clearing site data replays the welcome flow.
 
 The port is deliberate about what it does *not* do: it never calls the Worker,
 so nothing here needs a key. `localStorage` stands in for SwiftData — it holds
