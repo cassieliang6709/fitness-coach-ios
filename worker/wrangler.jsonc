@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fitness-coach-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-11-01",
+  // Required by @anthropic-ai/sdk (it imports node: built-ins).
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  }
+  // Secrets are NOT listed here. They live in Cloudflare, set with
+  // `wrangler secret put`. Anything written in this file is public.
+}

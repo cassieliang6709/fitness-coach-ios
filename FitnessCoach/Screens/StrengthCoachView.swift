@@ -17,9 +17,10 @@ struct StrengthCoachView: View {
 
             // Sticky: sits outside the scroll view, so it never moves.
             CurrentTaskCard(
-                title: session.coachedExercise.name,
+                title: session.currentExerciseName,
                 metrics: session.strengthMetrics,
                 progressLabel: session.setProgressLabel,
+                secondaryLabel: session.exerciseProgressLabel,
                 venue: MockData.strengthVenue,
                 pose: session.isResting ? .drink : .dumbbell
             ) {
@@ -50,9 +51,11 @@ struct StrengthCoachView: View {
         .animation(.easeInOut(duration: 0.25), value: session.phase)
         .onAppear { session.enterStrength() }
         .confirmationDialog("结束本次训练？", isPresented: $confirmEnd, titleVisibility: .visible) {
-            Button("结束训练", role: .destructive) {
-                session.reset()
-                path.popToRoot()
+            // Sets are already logged, so ending early goes to the review and
+            // reports the partial session rather than discarding it.
+            Button("结束并查看复盘") {
+                session.enterReview()
+                path.replaceLast(with: .review)
             }
             Button("继续训练", role: .cancel) {}
         }
@@ -67,7 +70,10 @@ struct StrengthCoachView: View {
             .transition(.opacity)
         } else {
             HStack(spacing: 10) {
-                SetProgressDots(total: session.totalSets, completed: session.completedSets)
+                SetProgressDots(
+                    total: session.currentExercise.sets,
+                    completed: session.completedSetsForCurrentExercise
+                )
 
                 Spacer(minLength: 8)
 

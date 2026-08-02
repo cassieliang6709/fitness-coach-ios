@@ -17,6 +17,7 @@ final class WorkoutStore {
 
     static let schema = Schema([
         MemoryRecord.self,
+        ProfileRecord.self,
         SessionRecord.self,
         SetLogRecord.self,
     ])
@@ -34,19 +35,66 @@ final class WorkoutStore {
         }
     }
 
-    // MARK: - Memories
+    // MARK: - Profile
 
-    /// Seeds the baseline profile on first launch only.
-    func seedMemoriesIfNeeded() {
-        let existing = (try? context.fetchCount(FetchDescriptor<MemoryRecord>())) ?? 0
-        guard existing == 0 else { return }
-        for memory in MockData.memories {
-            context.insert(
-                MemoryRecord(id: memory.id, category: memory.category, text: memory.text)
+    /// A profile row means the welcome flow has been completed. No row means a
+    /// brand new user, and the app opens on onboarding.
+    var hasProfile: Bool {
+        (try? context.fetchCount(FetchDescriptor<ProfileRecord>())) ?? 0 > 0
+    }
+
+    func profile() -> UserProfile? {
+        let singletonID = ProfileRecord.singletonID
+        let descriptor = FetchDescriptor<ProfileRecord>(
+            predicate: #Predicate { $0.id == singletonID }
+        )
+        return (try? context.fetch(descriptor).first)?.asProfile
+    }
+
+    var weeklyTarget: Int { profile()?.weeklyTarget ?? 4 }
+
+    /// Closes the welcome flow: stores the answers and turns each one into a
+    /// memory chip, so the coach starts already knowing this user.
+    func completeOnboarding(_ profile: UserProfile) {
+        let singletonID = ProfileRecord.singletonID
+        let descriptor = FetchDescriptor<ProfileRecord>(
+            predicate: #Predicate { $0.id == singletonID }
+        )
+        if let existing = try? context.fetch(descriptor).first {
+            existing.apply(profile)
+        } else {
+            context.insert(ProfileRecord(profile: profile))
+        }
+
+        for memory in profile.seedMemories {
+            upsertMemory(
+                id: memory.id,
+                category: memory.category,
+                text: memory.text,
+                sourceSessionID: nil
             )
         }
         save()
     }
+
+    /// Demo / UI-test shortcut: a finished profile plus the baseline memories,
+    /// so deep links can skip straight past the welcome flow.
+    func seedDemoProfileIfNeeded() {
+        guard !hasProfile else { return }
+        completeOnboarding(
+            UserProfile(goal: .fatLoss, venue: .gym, conditions: [.knee], style: .practical)
+        )
+        for memory in MockData.memories {
+            upsertMemory(
+                id: memory.id,
+                category: memory.category,
+                text: memory.text,
+                sourceSessionID: nil
+            )
+        }
+    }
+
+    // MARK: - Memories
 
     func activeMemories() -> [MemoryRecord] {
         let descriptor = FetchDescriptor<MemoryRecord>(
@@ -141,6 +189,7 @@ final class WorkoutStore {
         try? context.delete(model: SetLogRecord.self)
         try? context.delete(model: SessionRecord.self)
         try? context.delete(model: MemoryRecord.self)
+        try? context.delete(model: ProfileRecord.self)
         save()
     }
 

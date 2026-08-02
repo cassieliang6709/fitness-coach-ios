@@ -1,18 +1,21 @@
 import SwiftUI
 
 /// /workout/review
+///
+/// Reports logged work only. An exercise the user never reached shows as
+/// unfinished rather than getting a green tick.
 struct ReviewView: View {
     @Environment(WorkoutSession.self) private var session
     @Binding var path: [Route]
 
-    private var strengthRows: [(name: String, detail: String)] {
-        session.plan.strengthExercises.map { ($0.name, $0.volumeLabel) }
+    private var title: String {
+        session.completionPercent >= 100 ? "今天完成了" : "今天练到这里"
     }
 
     var body: some View {
         MobileAppShell {
-            PageHeader(title: "今天完成了") {
-                Mascot(pose: .celebration, size: 40)
+            PageHeader(title: title) {
+                Mascot(pose: session.completionPercent >= 100 ? .celebration : .idle, size: 40)
             }
 
             ScrollView {
@@ -20,13 +23,13 @@ struct ReviewView: View {
                     ReviewSummary(
                         title: session.plan.title,
                         symbol: "dumbbell.fill",
-                        rows: strengthRows
+                        outcomes: session.strengthOutcomes
                     )
 
                     ReviewSummary(
                         title: "有氧",
                         symbol: "figure.run",
-                        rows: [(MockData.cardioName, "\(session.cardioTarget) 分钟")]
+                        outcomes: [session.cardioOutcome]
                     )
 
                     MemoryNoteCard(

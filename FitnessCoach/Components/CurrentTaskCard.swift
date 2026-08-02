@@ -6,6 +6,7 @@ struct CurrentTaskCard<Accessory: View>: View {
     let title: String
     let metrics: String
     let progressLabel: String
+    var secondaryLabel: String?
     var progress: Double?
     var venue: String?
     var pose: MascotPose = .idle
@@ -15,6 +16,12 @@ struct CurrentTaskCard<Accessory: View>: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
+                    if let secondaryLabel {
+                        Text(secondaryLabel)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.primary)
+                    }
+
                     Text(title)
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(Theme.mainText)
@@ -66,6 +73,7 @@ extension CurrentTaskCard where Accessory == EmptyView {
         title: String,
         metrics: String,
         progressLabel: String,
+        secondaryLabel: String? = nil,
         progress: Double? = nil,
         venue: String? = nil,
         pose: MascotPose = .idle
@@ -74,6 +82,7 @@ extension CurrentTaskCard where Accessory == EmptyView {
             title: title,
             metrics: metrics,
             progressLabel: progressLabel,
+            secondaryLabel: secondaryLabel,
             progress: progress,
             venue: venue,
             pose: pose,

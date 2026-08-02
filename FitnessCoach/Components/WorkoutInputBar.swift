@@ -12,10 +12,23 @@ struct WorkoutInputBar: View {
     var body: some View {
         VStack(spacing: 10) {
             if let label = thread.voiceState.label {
-                Text(label)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Theme.primary)
-                    .transition(.opacity)
+                VStack(spacing: 4) {
+                    Text(label)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Theme.primary)
+
+                    // Live transcript: without it the user can't tell whether
+                    // the mic actually heard them.
+                    if !thread.partialTranscript.isEmpty {
+                        Text(thread.partialTranscript)
+                            .font(Theme.body)
+                            .foregroundStyle(Theme.mainText)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .transition(.opacity)
+                    }
+                }
+                .transition(.opacity)
             }
 
             switch thread.inputMode {
@@ -34,6 +47,7 @@ struct WorkoutInputBar: View {
         }
         .animation(.easeInOut(duration: 0.2), value: thread.inputMode)
         .animation(.easeInOut(duration: 0.2), value: thread.voiceState)
+        .animation(.easeInOut(duration: 0.15), value: thread.partialTranscript)
     }
 
     // MARK: - Rows
@@ -129,7 +143,8 @@ struct InputModeSwitcher: View {
     }
 }
 
-/// Big orange mic. Breathing rings while listening; no real speech API yet.
+/// Big orange mic. Breathing rings while listening. Tapping mid-sentence ends
+/// the turn early; the recognizer also stops on its own after a short pause.
 struct VoiceInputButton: View {
     let state: VoiceState
     let action: () -> Void
@@ -173,7 +188,7 @@ struct VoiceInputButton: View {
                 withAnimation(.easeOut(duration: 0.2)) { breathing = false }
             }
         }
-        .accessibilityLabel(state == .idle ? "开始语音" : "取消语音")
+        .accessibilityLabel(state == .idle ? "开始语音" : "结束语音")
     }
 
     private var symbol: String {

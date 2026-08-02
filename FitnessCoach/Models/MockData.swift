@@ -3,6 +3,44 @@ import Foundation
 /// All copy and numbers live here so screens stay data-driven.
 enum MockData {
 
+    // MARK: - Welcome
+
+    static let welcomeHighlights: [WelcomeHighlight] = [
+        WelcomeHighlight(
+            id: "coach",
+            symbol: "bubble.left.and.bubble.right.fill",
+            title: "训练时能说话",
+            body: "哪里不舒服、太重了、想换动作，说一句就改。"
+        ),
+        WelcomeHighlight(
+            id: "memory",
+            symbol: "brain.head.profile",
+            title: "记得住你",
+            body: "伤病、场地、习惯只说一次，下次自动生效。"
+        ),
+        WelcomeHighlight(
+            id: "honest",
+            symbol: "checkmark.seal.fill",
+            title: "只记你真做过的",
+            body: "复盘按实际完成的组数统计，不替你打勾。"
+        ),
+    ]
+
+    /// Title / subtitle for each question in the welcome flow.
+    static let welcomeSteps: [(title: String, subtitle: String)] = [
+        ("先认识一下", "我是你的 AI 陪练。训练时你说话，我改计划。"),
+        ("你想练成什么样？", "决定动作的重量、次数和有氧比例。"),
+        ("平时在哪训练？", "决定我给你安排哪些器械。"),
+        ("身体有需要避开的地方吗？", "可多选。这条会一直生效，优先级高于计划。"),
+        ("希望我用什么语气？", "随时可以在「我的计划」里改。"),
+    ]
+
+    static let styleSampleLines: [AIStyle: String] = [
+        .gentle: "慢一点，膝盖朝脚尖方向，髋部向后坐。",
+        .encouraging: "这个动作你上次做得很稳，髋部向后坐。",
+        .practical: "膝盖朝脚尖方向，髋部向后坐。",
+    ]
+
     // MARK: - Memories
 
     static let memories: [WorkoutMemory] = [
@@ -72,6 +110,67 @@ enum MockData {
     static let cardioPrescription = "6.0 km/h · 20 分钟"
     static let cardioStartMinutes = 12
     static let cardioTargetMinutes = 30
+
+    // MARK: - Home conversation (page 1, before training starts)
+
+    static let homeOpening: [CoachLine] = [
+        CoachLine(
+            core: "今天安排的是练腿日：力量 60 分钟，有氧 20–30 分钟。",
+            gentleLead: "不着急，",
+            encouragingLead: "上次练得不错，"
+        )
+    ]
+
+    /// Suggestion chips above the input bar. Each one matches a scripted turn,
+    /// so tapping a chip gets the reply it promises rather than the next line.
+    static let homeSuggestions = ["今天练什么？", "膝盖有点不舒服", "今天时间不多", "上次练得怎么样？"]
+
+    static let homeScript: [ScriptedTurn] = [
+        ScriptedTurn(
+            id: "home-what",
+            userText: "今天练什么？",
+            replies: [
+                CoachLine(
+                    core: "高脚杯深蹲、臀桥、台阶上步等 6 个动作，最后跑步机快走 20 分钟。",
+                    gentleLead: "先看一眼，",
+                    encouragingLead: "都是你练过的动作，"
+                )
+            ]
+        ),
+        ScriptedTurn(
+            id: "home-knee",
+            userText: "膝盖有点不舒服",
+            replies: [
+                CoachLine(
+                    core: "那深蹲今天从 10 kg 起，台阶上步先做 2 组。疼就立刻说。",
+                    gentleLead: "先别硬撑，",
+                    encouragingLead: "提前说出来最好，"
+                )
+            ]
+        ),
+        ScriptedTurn(
+            id: "home-short",
+            userText: "今天时间不多",
+            replies: [
+                CoachLine(
+                    core: "那就只做深蹲、臀桥、腿推，有氧压到 15 分钟，40 分钟能结束。",
+                    gentleLead: "少练也是练，",
+                    encouragingLead: "能来就已经赢了一半，"
+                )
+            ]
+        ),
+        ScriptedTurn(
+            id: "home-last",
+            userText: "上次练得怎么样？",
+            replies: [
+                CoachLine(
+                    core: "上次全部完成，深蹲停在 12 kg。今天可以试试 14 kg。",
+                    gentleLead: "按感觉来，",
+                    encouragingLead: "上次很稳，"
+                )
+            ]
+        ),
+    ]
 
     // MARK: - Scripts
 

@@ -4,7 +4,9 @@ import SwiftUI
 struct ReviewSummary: View {
     let title: String
     let symbol: String
-    let rows: [(name: String, detail: String)]
+    let outcomes: [ExerciseOutcome]
+
+    private var allComplete: Bool { outcomes.allSatisfy(\.isComplete) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -19,25 +21,27 @@ struct ReviewSummary: View {
 
                 Spacer(minLength: 8)
 
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: allComplete ? "checkmark.circle.fill" : "circle.dotted")
                     .font(.system(size: 18))
-                    .foregroundStyle(Theme.success)
+                    .foregroundStyle(allComplete ? Theme.success : Theme.secondaryText)
             }
 
             VStack(spacing: 10) {
-                ForEach(rows, id: \.name) { row in
+                ForEach(outcomes) { outcome in
                     HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(systemName: statusSymbol(for: outcome))
                             .font(.system(size: 14))
-                            .foregroundStyle(Theme.success)
+                            .foregroundStyle(statusTint(for: outcome))
 
-                        Text(row.name)
+                        Text(outcome.name)
                             .font(Theme.body)
-                            .foregroundStyle(Theme.mainText)
+                            .foregroundStyle(
+                                outcome.isUntouched ? Theme.secondaryText : Theme.mainText
+                            )
 
                         Spacer(minLength: 8)
 
-                        Text(row.detail)
+                        Text(outcome.detail)
                             .font(Theme.caption)
                             .foregroundStyle(Theme.secondaryText)
                             .monospacedDigit()
@@ -46,6 +50,16 @@ struct ReviewSummary: View {
             }
         }
         .card()
+    }
+
+    private func statusSymbol(for outcome: ExerciseOutcome) -> String {
+        if outcome.isComplete { return "checkmark.circle.fill" }
+        return outcome.isUntouched ? "circle" : "circle.lefthalf.filled"
+    }
+
+    private func statusTint(for outcome: ExerciseOutcome) -> Color {
+        if outcome.isComplete { return Theme.success }
+        return outcome.isUntouched ? Theme.border : Theme.primary
     }
 }
 

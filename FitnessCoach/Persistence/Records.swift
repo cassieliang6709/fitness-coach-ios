@@ -5,8 +5,6 @@ import SwiftData
 /// that makes "AI 记住你" true rather than a slogan.
 @Model
 final class MemoryRecord {
-    #Index<MemoryRecord>([\.createdAt])
-
     @Attribute(.unique) var id: String
     var categoryRaw: String
     var text: String
@@ -40,6 +38,51 @@ final class MemoryRecord {
 
     var asMemory: WorkoutMemory {
         WorkoutMemory(id: id, category: category, text: text, active: active)
+    }
+}
+
+/// The welcome flow's answers. Its existence is also the "has this user been
+/// onboarded" flag — one row, id `me`.
+@Model
+final class ProfileRecord {
+    @Attribute(.unique) var id: String
+    var goalRaw: String
+    var venueRaw: String
+    var conditionRaws: [String]
+    var aiStyleRaw: String
+    var weeklyTarget: Int
+    var createdAt: Date
+    var updatedAt: Date
+
+    static let singletonID = "me"
+
+    init(id: String = ProfileRecord.singletonID, profile: UserProfile, createdAt: Date = .now) {
+        self.id = id
+        self.goalRaw = profile.goal.rawValue
+        self.venueRaw = profile.venue.rawValue
+        self.conditionRaws = profile.conditions.map(\.rawValue)
+        self.aiStyleRaw = profile.style.rawValue
+        self.weeklyTarget = profile.weeklyTarget
+        self.createdAt = createdAt
+        self.updatedAt = createdAt
+    }
+
+    var asProfile: UserProfile {
+        UserProfile(
+            goal: TrainingGoal(rawValue: goalRaw) ?? .fatLoss,
+            venue: TrainingVenue(rawValue: venueRaw) ?? .gym,
+            conditions: conditionRaws.compactMap(BodyCondition.init(rawValue:)),
+            style: AIStyle(rawValue: aiStyleRaw) ?? .practical
+        )
+    }
+
+    func apply(_ profile: UserProfile) {
+        goalRaw = profile.goal.rawValue
+        venueRaw = profile.venue.rawValue
+        conditionRaws = profile.conditions.map(\.rawValue)
+        aiStyleRaw = profile.style.rawValue
+        weeklyTarget = profile.weeklyTarget
+        updatedAt = .now
     }
 }
 
@@ -83,6 +126,12 @@ final class SessionRecord {
     var durationMinutes: Int {
         let end = endedAt ?? .now
         return max(1, Int(end.timeIntervalSince(startedAt) / 60))
+    }
+
+    /// Logged sets over planned sets — the same honest number the review shows.
+    var completionPercent: Int {
+        guard plannedSetCount > 0 else { return 0 }
+        return Int((Double(setLogs.count) / Double(plannedSetCount) * 100).rounded())
     }
 }
 

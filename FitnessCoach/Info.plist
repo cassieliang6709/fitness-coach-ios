@@ -20,6 +20,14 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>COACH_API_HOST</key>
+	<string>$(COACH_API_HOST)</string>
+	<key>COACH_SHARED_SECRET</key>
+	<string>$(COACH_SHARED_SECRET)</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>训练中用麦克风听你说话，把不适和反馈告诉教练。</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>把你说的话转成文字发给 AI 教练。识别在设备上完成。</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

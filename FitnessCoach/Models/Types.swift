@@ -134,7 +134,8 @@ enum ChatRole: Hashable {
 struct ChatMessage: Identifiable, Hashable {
     let id: String
     let role: ChatRole
-    let content: String
+    /// Mutable: streamed replies grow a single bubble instead of appending many.
+    var content: String
     let timestamp: Date
 
     init(id: String = UUID().uuidString, role: ChatRole, content: String, timestamp: Date = .now) {

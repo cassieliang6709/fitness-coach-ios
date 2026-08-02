@@ -7,6 +7,8 @@ struct PageHeader<Trailing: View>: View {
     }
 
     let title: String
+    /// Second line under a large title. Ignored by the nav-bar style.
+    var subtitle: String?
     var style: Style = .large
     var onBack: (() -> Void)?
     @ViewBuilder var trailing: Trailing
@@ -16,9 +18,19 @@ struct PageHeader<Trailing: View>: View {
             switch style {
             case .large:
                 HStack(alignment: .center) {
-                    Text(title)
-                        .font(Theme.pageTitle)
-                        .foregroundStyle(Theme.mainText)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(title)
+                            .font(Theme.pageTitle)
+                            .foregroundStyle(Theme.mainText)
+
+                        if let subtitle {
+                            Text(subtitle)
+                                .font(Theme.body)
+                                .foregroundStyle(Theme.secondaryText)
+                                .transition(.opacity)
+                                .id(subtitle)
+                        }
+                    }
                     Spacer(minLength: 8)
                     trailing
                 }
@@ -48,8 +60,19 @@ struct PageHeader<Trailing: View>: View {
 }
 
 extension PageHeader where Trailing == EmptyView {
-    init(title: String, style: Style = .large, onBack: (() -> Void)? = nil) {
-        self.init(title: title, style: style, onBack: onBack, trailing: { EmptyView() })
+    init(
+        title: String,
+        subtitle: String? = nil,
+        style: Style = .large,
+        onBack: (() -> Void)? = nil
+    ) {
+        self.init(
+            title: title,
+            subtitle: subtitle,
+            style: style,
+            onBack: onBack,
+            trailing: { EmptyView() }
+        )
     }
 }
 

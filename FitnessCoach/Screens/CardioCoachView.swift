@@ -57,9 +57,11 @@ struct CardioCoachView: View {
         .animation(.easeInOut(duration: 0.25), value: session.phase)
         .onAppear { session.enterCardio() }
         .confirmationDialog("结束本次训练？", isPresented: $confirmEnd, titleVisibility: .visible) {
-            Button("结束训练", role: .destructive) {
-                session.reset()
-                path.popToRoot()
+            // Sets are already logged, so ending early goes to the review and
+            // reports the partial session rather than discarding it.
+            Button("结束并查看复盘") {
+                session.enterReview()
+                path.replaceLast(with: .review)
             }
             Button("继续训练", role: .cancel) {}
         }

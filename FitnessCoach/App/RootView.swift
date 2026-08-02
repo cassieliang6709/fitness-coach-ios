@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Routes mirror the spec's URL paths one-to-one.
-/// /plans is the stack root; the rest are pushed destinations.
+/// /home is the stack root; the rest are pushed destinations.
 enum Route: Hashable {
+    case home
     case plans
     case legDay
     case strength
@@ -11,6 +12,7 @@ enum Route: Hashable {
 
     var path: String {
         switch self {
+        case .home: return "/home"
         case .plans: return "/plans"
         case .legDay: return "/plans/leg-day"
         case .strength: return "/workout/strength"
@@ -24,18 +26,31 @@ enum Route: Hashable {
         self = match
     }
 
-    static let all: [Route] = [.plans, .legDay, .strength, .cardio, .review]
+    static let all: [Route] = [.home, .plans, .legDay, .strength, .cardio, .review]
 }
 
 struct RootView: View {
-    @State private var session = WorkoutSession()
+    let session: WorkoutSession
+    let store: WorkoutStore
+
     @State private var path: [Route] = []
+    /// A stored profile means the welcome flow is done. Held in state so
+    /// finishing onboarding swaps the root without a relaunch.
+    @State private var onboarded: Bool
+
+    init(session: WorkoutSession, store: WorkoutStore) {
+        self.session = session
+        self.store = store
+        _onboarded = State(initialValue: store.hasProfile)
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
-            PlanLibraryView(path: $path)
+            root
                 .navigationDestination(for: Route.self) { route in
                     switch route {
+                    case .home:
+                        HomeView(path: $path)
                     case .plans:
                         PlanLibraryView(path: $path)
                     case .legDay:
@@ -50,9 +65,29 @@ struct RootView: View {
                 }
         }
         .environment(session)
+        .environment(\.workoutStore, store)
         .tint(Theme.primary)
         .preferredColorScheme(.light)
         .onAppear(perform: applyLaunchRoute)
+    }
+
+    @ViewBuilder
+    private var root: some View {
+        if onboarded {
+            HomeView(path: $path)
+        } else {
+            WelcomeView(onFinish: finishOnboarding)
+        }
+    }
+
+    /// The welcome answers become the profile, the memory chips and the coach's
+    /// tone in one step — nothing is left for the user to set up afterwards.
+    private func finishOnboarding(_ profile: UserProfile) {
+        store.completeOnboarding(profile)
+        session.aiStyle = profile.style
+        withAnimation(.easeInOut(duration: 0.3)) {
+            onboarded = true
+        }
     }
 
     /// Deep-link straight to a route for screenshotting and manual QA:
@@ -60,9 +95,10 @@ struct RootView: View {
     private func applyLaunchRoute() {
         #if DEBUG
         guard path.isEmpty,
+            onboarded,
             let raw = UserDefaults.standard.string(forKey: "route"),
             let route = Route(path: raw),
-            route != .plans
+            route != .home
         else { return }
         path = [route]
         #endif
@@ -84,5 +120,18 @@ extension Array where Element == Route {
 
     mutating func popToRoot() {
         removeAll()
+    }
+}
+
+// MARK: - Store access
+
+private struct WorkoutStoreKey: EnvironmentKey {
+    static let defaultValue: WorkoutStore? = nil
+}
+
+extension EnvironmentValues {
+    var workoutStore: WorkoutStore? {
+        get { self[WorkoutStoreKey.self] }
+        set { self[WorkoutStoreKey.self] = newValue }
     }
 }
