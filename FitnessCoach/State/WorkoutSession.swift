@@ -16,8 +16,14 @@ final class WorkoutSession {
     /// True for a cached or server-backed plan. When the live service is
     /// configured, the sample plan is never presented as the user's plan.
     private(set) var hasGeneratedPlan = false
-    private(set) var isPlanLoading = false
-    private(set) var planError: String?
+    /// Fetching the stored plan is still a plain request. Generating one is a
+    /// coach turn, so its progress and its failure live on the thread — these
+    /// two read as one state to the pages so there is no second copy to drift.
+    private(set) var isFetchingPlan = false
+    private(set) var fetchError: String?
+
+    var isPlanLoading: Bool { isFetchingPlan || daily.isGeneratingPlan }
+    var planError: String? { fetchError ?? daily.planFailure }
     private(set) var exerciseCatalog: [ExerciseCatalogItem] = []
     private(set) var isCatalogLoading = false
     private(set) var catalogError: String?
@@ -239,24 +245,29 @@ final class WorkoutSession {
         guard phase == .planning, !isPlanLoading else { return }
         guard let api else {
             if !hasGeneratedPlan {
-                planError = "教练服务未配置，暂时无法生成真实计划。"
+                fetchError = "教练服务未配置，暂时无法生成真实计划。"
             }
             return
         }
-        isPlanLoading = true
-        planError = nil
-        defer { isPlanLoading = false }
 
+        isFetchingPlan = true
+        fetchError = nil
+        var missing = false
         do {
             if let wire = try await api.activePlan(), wire.wasCreatedToday {
                 guard receive(wire) else { throw PlanSyncError.invalidPlan }
-                return
-            }
-            if generateIfMissing, !hasGeneratedPlan {
-                try await generatePlan(using: api, replacingCurrent: false)
+            } else {
+                missing = true
             }
         } catch {
-            planError = error.localizedDescription
+            fetchError = error.localizedDescription
+        }
+        isFetchingPlan = false
+
+        // Generating is a coach turn and reports its own progress, so this
+        // hands off rather than waiting: the thread owns the rest.
+        if missing, generateIfMissing, !hasGeneratedPlan {
+            daily.requestPlan(replacingCurrent: false)
         }
     }
 
@@ -284,59 +295,18 @@ final class WorkoutSession {
         exerciseCatalog.first { $0.id == id }
     }
 
-    /// Asks the same Worker tool for a new plan; used by the plan library's
-    /// explicit "换一份" action.
-    func regeneratePlan() async {
-        guard let api, phase == .planning, !isPlanLoading else { return }
-        isPlanLoading = true
-        planError = nil
-        defer { isPlanLoading = false }
-
-        do {
-            try await generatePlan(using: api, replacingCurrent: true)
-        } catch {
-            planError = error.localizedDescription
-        }
-    }
-
-    private func generatePlan(using api: CoachAPI, replacingCurrent: Bool) async throws {
-        let profile = store.profile()
-        let prompt =
-            replacingCurrent
-            ? "请根据我的目标、场地和身体状况，直接换一份不同的今日训练计划。"
-            : "请根据我的目标、场地和身体状况，直接生成今天的训练计划。"
-        let context = CoachContext(
-            phase: "planning",
-            exercise: hasGeneratedPlan ? plan.title : "尚未生成计划",
-            prescription: profile?.summary ?? "按用户记忆生成",
-            venue: profile?.venue.label
-        )
-        let request = CoachTurnRequest(
-            style: aiStyle.rawValue,
-            state: context,
-            memories: store.activeMemories().map(\.text),
-            history: store.recentSessionSummaries(),
-            messages: [.user(prompt)]
-        )
-
-        var received = false
-        for try await event in api.stream(request) {
-            switch event {
-            case .plan(let wire):
-                received = receive(wire)
-            case .planError(let reason):
-                throw PlanSyncError.rejected(reason)
-            default:
-                break
-            }
-        }
-        guard received else { throw PlanSyncError.missingPlan }
+    /// Asks the coach for a different plan; used by the plan library's explicit
+    /// "换一份" action.
+    func regeneratePlan() {
+        guard api != nil, phase == .planning, !isPlanLoading else { return }
+        fetchError = nil
+        daily.requestPlan(replacingCurrent: true)
     }
 
     @discardableResult
     private func receive(_ wire: PlanWire, refreshIfNeeded: Bool = true) -> Bool {
         guard let generated = wire.asPlan else {
-            planError = PlanSyncError.invalidPlan.localizedDescription
+            fetchError = PlanSyncError.invalidPlan.localizedDescription
             return false
         }
 
@@ -346,7 +316,7 @@ final class WorkoutSession {
         guard phase == .planning else { return true }
         plan = generated
         hasGeneratedPlan = true
-        planError = nil
+        fetchError = nil
 
         // The plan SSE is intentionally compact. Fetch the persisted version
         // once so body part, equipment and coaching steps arrive in the iOS
@@ -712,14 +682,10 @@ final class WorkoutSession {
 
 private enum PlanSyncError: LocalizedError {
     case invalidPlan
-    case missingPlan
-    case rejected(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidPlan: return "计划缺少可执行的力量动作"
-        case .missingPlan: return "AI 没有返回可用计划，请重试"
-        case .rejected(let reason): return "计划没有通过校验：\(reason)"
         }
     }
 }

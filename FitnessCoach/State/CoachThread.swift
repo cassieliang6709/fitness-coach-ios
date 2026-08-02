@@ -192,6 +192,54 @@ final class CoachThread {
         }
     }
 
+    // MARK: - Plan
+
+    /// True while a plan asked for by a button is in flight, so the plan page
+    /// can show progress without keeping its own copy of the request state.
+    private(set) var isGeneratingPlan = false
+
+    /// Why the last plan request failed. Narrower than `lastError` on purpose:
+    /// a speech-playback failure belongs in the chat banner, not on the plan
+    /// page as though the plan itself were broken.
+    private(set) var planFailure: String?
+
+    /// A plan asked for by tapping rather than by talking.
+    ///
+    /// The prompt is synthetic, so it enters the model's context without
+    /// becoming a user bubble — but everything the coach says back is shown
+    /// like any other turn. That is the point of routing this through the same
+    /// path as the chat: the button used to open its own stream and keep only
+    /// the `plan` event, so a reply that asked a question instead of returning
+    /// a plan disappeared, and the page just said "还没有可用计划".
+    func requestPlan(replacingCurrent: Bool) {
+        guard isLive else { return }
+        guard !isBusy, work == nil else {
+            let busy = "教练正在回复，稍等一下再生成"
+            report(busy)
+            planFailure = busy
+            return
+        }
+
+        voiceNotice = nil
+        clearError()
+        planFailure = nil
+        isGeneratingPlan = true
+
+        let prompt =
+            replacingCurrent
+            ? "请根据我的目标、场地和身体状况，直接换一份不同的今日训练计划。"
+            : "请根据我的目标、场地和身体状况，直接生成今天的训练计划。"
+
+        work = Task {
+            await runLiveTurn(userText: prompt)
+            // A turn that answered with a question rather than a plan is not a
+            // failure — the reply is on screen. Only a real error carries over.
+            planFailure = lastError
+            isGeneratingPlan = false
+            finishWork()
+        }
+    }
+
     /// The pre-recorded path: a 2s pause, then the next scripted user line.
     private func runScriptedVoiceTurn() async {
         voiceState = .listening

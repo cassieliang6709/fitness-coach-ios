@@ -56,7 +56,7 @@ struct PlanLibraryView: View {
                             : (session.canStartWorkout ? "让 AI 换一份" : "生成计划"),
                         enabled: !session.isPlanLoading
                     ) {
-                        Task { await session.regeneratePlan() }
+                        session.regeneratePlan()
                     }
                 } else {
                     PrimaryButton(
