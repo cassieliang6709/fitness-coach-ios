@@ -153,6 +153,9 @@ final class WorkoutFlowUITests: XCTestCase {
             app.staticTexts["今天安排的是练腿日：力量 60 分钟，有氧 20–30 分钟。"]
                 .waitForExistence(timeout: 8)
         )
+        // A cached/default plan is not a chat result. The card only appears
+        // after this conversation actually generates a new plan.
+        XCTAssertFalse(app.staticTexts["AI 计划已生成"].exists)
 
         // A chip answers the question it names, not the next line in the script.
         app.buttons["今天时间不多"].waitAndTap()

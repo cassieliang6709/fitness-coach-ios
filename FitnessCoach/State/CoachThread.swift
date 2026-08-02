@@ -310,6 +310,7 @@ final class CoachThread {
             let confirmation =
                 "计划已生成：\(generatedPlanTitle)。可以直接查看动作、训练部位和安排原因。"
             append(.init(role: .assistant, content: confirmation))
+            append(.init(role: .assistant, kind: .generatedPlan, content: generatedPlanTitle))
             streamed = [streamed, confirmation].filter { !$0.isEmpty }.joined(separator: " ")
         }
 

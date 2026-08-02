@@ -134,30 +134,25 @@ private struct HomeChatTab: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ChatThread(messages: thread.messages, isTyping: thread.isTyping)
-                .frame(maxHeight: .infinity)
-                .layoutPriority(1)
-
-            if session.hasGeneratedPlan {
-                GeneratedPlanResultCard(plan: session.plan) {
-                    path.append(.legDay)
-                }
-                .padding(.horizontal, Theme.pagePadding)
-                .padding(.bottom, 10)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+            ChatThread(
+                messages: thread.messages,
+                isTyping: thread.isTyping,
+                generatedPlan: session.plan,
+                onOpenGeneratedPlan: { path.append(.legDay) }
+            )
+            .frame(maxHeight: .infinity)
+            .layoutPriority(1)
 
             SuggestionRow(suggestions: visibleSuggestions) { text in
                 thread.send(text: text)
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: session.hasGeneratedPlan)
     }
 }
 
 /// The generated plan stays in the conversation where the user asked for it.
 /// It is intentionally compact: the detail screen owns the full exercise list.
-private struct GeneratedPlanResultCard: View {
+struct GeneratedPlanResultCard: View {
     let plan: WorkoutPlan
     let action: () -> Void
 

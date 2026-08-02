@@ -182,16 +182,29 @@ enum ChatRole: Hashable {
     case assistant
 }
 
+enum ChatMessageKind: Hashable {
+    case text
+    case generatedPlan
+}
+
 struct ChatMessage: Identifiable, Hashable {
     let id: String
     let role: ChatRole
+    let kind: ChatMessageKind
     /// Mutable: streamed replies grow a single bubble instead of appending many.
     var content: String
     let timestamp: Date
 
-    init(id: String = UUID().uuidString, role: ChatRole, content: String, timestamp: Date = .now) {
+    init(
+        id: String = UUID().uuidString,
+        role: ChatRole,
+        kind: ChatMessageKind = .text,
+        content: String,
+        timestamp: Date = .now
+    ) {
         self.id = id
         self.role = role
+        self.kind = kind
         self.content = content
         self.timestamp = timestamp
     }
