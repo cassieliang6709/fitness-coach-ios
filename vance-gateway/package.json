@@ -1,0 +1,12 @@
+{
+  "name": "vance-realtime-gateway",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

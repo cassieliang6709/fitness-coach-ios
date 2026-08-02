@@ -108,6 +108,20 @@ final class WorkoutSession {
         return CoachAPI.fromBundle()
     }
 
+    /// Realtime is optional so the existing Claude SSE and scripted flows keep
+    /// working on simulators, UI tests, and builds without gateway settings.
+    private static func makeRealtime() -> RealtimeCoachClient? {
+        if ProcessInfo.processInfo.arguments.contains("-uitest") { return nil }
+        guard let config = VanceGatewayConfig.fromBundle() else { return nil }
+        return RealtimeCoachClient(config: config)
+    }
+
+    private static func makeVision() -> GymVisionAPI? {
+        if ProcessInfo.processInfo.arguments.contains("-uitest") { return nil }
+        guard let config = VanceGatewayConfig.fromBundle() else { return nil }
+        return GymVisionAPI(config: config)
+    }
+
     private func makeDailyThread() {
         daily = CoachThread(
             opening: MockData.homeOpening,
@@ -148,6 +162,12 @@ final class WorkoutSession {
     private func configure(_ thread: CoachThread, phase: String) {
         thread.style = aiStyle
         thread.api = Self.makeAPI()
+        if let realtime = Self.makeRealtime() {
+            thread.configureRealtime(realtime)
+        }
+        if let vision = Self.makeVision() {
+            thread.configureVision(vision)
+        }
         thread.speech = speech
         thread.memoryProvider = { [weak self] in
             self?.store.activeMemories().map(\.text) ?? []

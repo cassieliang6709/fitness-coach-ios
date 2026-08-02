@@ -26,6 +26,8 @@ targets:
         NSSpeechRecognitionUsageDescription: 把你说的话转成文字发给 AI 教练。识别在设备上完成。
         COACH_API_HOST: $(COACH_API_HOST)
         COACH_SHARED_SECRET: $(COACH_SHARED_SECRET)
+        VANCE_GATEWAY_HOST: $(VANCE_GATEWAY_HOST)
+        VANCE_GATEWAY_SHARED_SECRET: $(VANCE_GATEWAY_SHARED_SECRET)
     configFiles:
       Debug: Secrets.xcconfig
       Release: Secrets.xcconfig

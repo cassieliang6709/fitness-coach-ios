@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0C65A612B7D04DBF97B30447 /* RealtimeCoachClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C65A611B7D04DBF97B30447 /* RealtimeCoachClient.swift */; };
+		0C65A614B7D04DBF97B30447 /* VanceGateway.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C65A613B7D04DBF97B30447 /* VanceGateway.swift */; };
 		168E3B6ED12354B41CCADFDA /* WorkoutSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E978E9CEC3D2D0FF70DDD8EF /* WorkoutSession.swift */; };
 		1919BAA9CACE7F394BB378CB /* ChatThread.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0FBB6446BD083F19DF5982A /* ChatThread.swift */; };
 		2005D8A5838921F183FD56BB /* LegDayDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE6F9CFAC97BDD6AE7500AA /* LegDayDetailView.swift */; };
@@ -60,6 +62,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0C65A611B7D04DBF97B30447 /* RealtimeCoachClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeCoachClient.swift; sourceTree = "<group>"; };
+		0C65A613B7D04DBF97B30447 /* VanceGateway.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VanceGateway.swift; sourceTree = "<group>"; };
 		039CDDC6FF8960B651935C04 /* ExerciseList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseList.swift; sourceTree = "<group>"; };
 		09115B9CFAEAA51EBC563F2C /* PrimaryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimaryButton.swift; sourceTree = "<group>"; };
 		09F816905C35AB68C054EB7A /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
@@ -206,6 +210,8 @@
 			children = (
 				E3A31345BE42DB570477C73E /* CoachAPI.swift */,
 				4EAEF8E29C86B03176E3121C /* CoachWire.swift */,
+				0C65A611B7D04DBF97B30447 /* RealtimeCoachClient.swift */,
+				0C65A613B7D04DBF97B30447 /* VanceGateway.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -369,6 +375,7 @@
 				748D17F3A544100BFA0F6757 /* CoachAPI.swift in Sources */,
 				FB5DAD1A355F748FE0B84341 /* CoachThread.swift in Sources */,
 				4EFC75453A1F11CF86227F18 /* CoachWire.swift in Sources */,
+				0C65A612B7D04DBF97B30447 /* RealtimeCoachClient.swift in Sources */,
 				9E491709BB5135411D3E6491 /* CurrentTaskCard.swift in Sources */,
 				94D47636CF2255B287C09EF0 /* ExerciseList.swift in Sources */,
 				A27D4B2E24610CACF07D2A42 /* FitnessCoachApp.swift in Sources */,
@@ -393,6 +400,7 @@
 				D2B421742496358634F98A96 /* Theme.swift in Sources */,
 				5101575C257AA45781683BB8 /* TrainingStats.swift in Sources */,
 				41A66281F004044A0BD50C5C /* Types.swift in Sources */,
+				0C65A614B7D04DBF97B30447 /* VanceGateway.swift in Sources */,
 				9E5F9F2D5FE8CB69EAD94F69 /* WeekStripe.swift in Sources */,
 				2810E4061AC3F3B1775B47B5 /* WelcomeView.swift in Sources */,
 				707850155AACB74E6BC3B4A7 /* WorkoutInputBar.swift in Sources */,

@@ -117,6 +117,9 @@ struct CoachContext: Codable, Hashable {
     var venue: String?
     var elapsedMinutes: Int?
     var targetMinutes: Int?
+    /// Only high-confidence equipment from the most recently recognized gym photo.
+    /// It is context for the next coach turn, never a training plan by itself.
+    var availableEquipment: [String]?
 }
 
 struct CoachTurnRequest: Codable {

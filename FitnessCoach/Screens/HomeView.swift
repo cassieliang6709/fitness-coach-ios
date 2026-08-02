@@ -1,5 +1,7 @@
 import SwiftData
 import SwiftUI
+import PhotosUI
+import UIKit
 
 /// /home — the app's root after onboarding.
 ///
@@ -143,48 +145,93 @@ private struct HomeInputBar: View {
     @Bindable var thread: CoachThread
 
     @State private var draft = ""
+    @State private var photoItem: PhotosPickerItem?
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 8) {
-                TextField("和教练说点什么…", text: $draft)
-                    .font(Theme.body)
-                    .focused($focused)
-                    .submitLabel(.send)
-                    .onSubmit(submit)
+        VStack(spacing: 6) {
+            if thread.isVisionRecognizing {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("正在识别器械…")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.secondaryText)
+                    Spacer(minLength: 0)
+                }
+                .transition(.opacity)
+            }
 
-                Button(action: submit) {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            Circle().fill(canSend ? Theme.primary : Theme.primary.opacity(0.35))
-                        )
+            HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    TextField("和教练说点什么…", text: $draft)
+                        .font(Theme.body)
+                        .focused($focused)
+                        .submitLabel(.send)
+                        .onSubmit(submit)
+
+                    Button(action: submit) {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 28, height: 28)
+                            .background(
+                                Circle().fill(canSend ? Theme.primary : Theme.primary.opacity(0.35))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canSend)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: Theme.tapTarget)
+                .background(Capsule(style: .continuous).fill(Theme.surface))
+                .overlay(Capsule(style: .continuous).strokeBorder(Theme.border, lineWidth: 1))
+
+                PhotosPicker(selection: $photoItem, matching: .images) {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.primary)
+                        .frame(width: Theme.tapTarget, height: Theme.tapTarget)
+                        .background(Circle().fill(Theme.lightOrange))
                 }
                 .buttonStyle(.plain)
-                .disabled(!canSend)
-            }
-            .padding(.horizontal, 12)
-            .frame(height: Theme.tapTarget)
-            .background(Capsule(style: .continuous).fill(Theme.surface))
-            .overlay(Capsule(style: .continuous).strokeBorder(Theme.border, lineWidth: 1))
+                .disabled(thread.isVisionRecognizing || thread.isBusy)
+                .accessibilityLabel("上传器械图")
 
-            IconButton(
-                symbol: thread.voiceState == .idle ? "mic.fill" : "stop.fill",
-                tint: thread.voiceState == .idle ? Theme.primary : .white,
-                background: thread.voiceState == .idle ? Theme.lightOrange : Theme.primary
-            ) {
-                if thread.voiceState == .idle {
-                    thread.beginVoiceTurn()
-                } else {
-                    thread.cancelVoiceTurn()
+                IconButton(
+                    symbol: thread.voiceState == .idle ? "mic.fill" : "stop.fill",
+                    tint: thread.voiceState == .idle ? Theme.primary : .white,
+                    background: thread.voiceState == .idle ? Theme.lightOrange : Theme.primary
+                ) {
+                    if thread.voiceState == .idle {
+                        thread.beginVoiceTurn()
+                    } else {
+                        thread.cancelVoiceTurn()
+                    }
                 }
+                .accessibilityLabel(thread.voiceState == .idle ? "开始语音" : "取消语音")
             }
-            .accessibilityLabel(thread.voiceState == .idle ? "开始语音" : "取消语音")
         }
         .animation(.easeInOut(duration: 0.2), value: thread.voiceState)
+        .animation(.easeInOut(duration: 0.2), value: thread.isVisionRecognizing)
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            Task {
+                do {
+                    guard
+                        let data = try await item.loadTransferable(type: Data.self),
+                        let image = UIImage(data: data),
+                        let jpeg = image.jpegData(compressionQuality: 0.85)
+                    else {
+                        return
+                    }
+                    await thread.recognizeGymEquipment(imageData: jpeg, mimeType: "image/jpeg")
+                } catch {
+                    // The thread already has a user-facing recovery path when
+                    // the gateway rejects a valid photo. Loading failures stay local.
+                }
+                photoItem = nil
+            }
+        }
     }
 
     private var canSend: Bool {

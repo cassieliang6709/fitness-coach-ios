@@ -6,3 +6,8 @@ xcuserdata/
 *.xcworkspace/xcuserdata/
 .swiftpm/
 Secrets.xcconfig
+/vance-gateway/.env
+/vance-gateway/.env.*
+!/vance-gateway/.env.example
+/vance-gateway/data/
+/vance-gateway/logs/
