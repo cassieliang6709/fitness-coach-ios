@@ -45,26 +45,64 @@ struct CoachAPI: Sendable {
         return components.url
     }
 
+    // MARK: - Requests
+
+    /// Every endpoint is authorized the same way, so the header, the timeout
+    /// and the "no config" failure are stated once instead of at each call.
+    private func authorized(
+        _ url: URL?,
+        method: String = "GET",
+        accept: String? = nil,
+        timeout: TimeInterval
+    ) throws -> URLRequest {
+        guard let url else { throw CoachAPIError.notConfigured }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("Bearer \(sharedSecret)", forHTTPHeaderField: "Authorization")
+        if let accept { request.setValue(accept, forHTTPHeaderField: "Accept") }
+        request.timeoutInterval = timeout
+        return request
+    }
+
+    private func authorizedJSON(
+        _ url: URL?,
+        body: some Encodable,
+        accept: String,
+        timeout: TimeInterval
+    ) throws -> URLRequest {
+        var request = try authorized(url, method: "POST", accept: accept, timeout: timeout)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(body)
+        return request
+    }
+
+    /// Sends a non-streaming request and turns any non-200 into an error, so
+    /// callers only ever handle a body.
+    private func send(_ request: URLRequest) async throws -> Data {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try check(response)
+        return data
+    }
+
+    private func check(_ response: URLResponse) throws {
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw CoachAPIError.http(status: http.statusCode)
+        }
+    }
+
     func stream(_ request: CoachTurnRequest) -> AsyncThrowingStream<CoachEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    guard let url = turnURL else { throw CoachAPIError.notConfigured }
-
-                    var urlRequest = URLRequest(url: url)
-                    urlRequest.httpMethod = "POST"
-                    urlRequest.setValue(
-                        "Bearer \(sharedSecret)", forHTTPHeaderField: "Authorization")
-                    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                    urlRequest.timeoutInterval = 60
-                    urlRequest.httpBody = try JSONEncoder().encode(request)
+                    let urlRequest = try authorizedJSON(
+                        turnURL,
+                        body: request,
+                        accept: "text/event-stream",
+                        timeout: 60
+                    )
 
                     let (bytes, response) = try await URLSession.shared.bytes(for: urlRequest)
-
-                    if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                        throw CoachAPIError.http(status: http.statusCode)
-                    }
+                    try check(response)
 
                     var event = ""
                     for try await line in bytes.lines {
@@ -95,20 +133,14 @@ struct CoachAPI: Sendable {
     /// Voices the coach's exact final reply. MiniMax is a TTS provider here,
     /// not a second model that can alter what the user already sees on screen.
     func synthesizeSpeech(_ text: String) async throws -> Data {
-        guard let url = speechURL else { throw CoachAPIError.notConfigured }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(sharedSecret)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("audio/mpeg", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 30
-        request.httpBody = try JSONEncoder().encode(SpeechRequest(text: text))
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw CoachAPIError.http(status: http.statusCode)
-        }
+        let data = try await send(
+            authorizedJSON(
+                speechURL,
+                body: SpeechRequest(text: text),
+                accept: "audio/mpeg",
+                timeout: 30
+            )
+        )
         guard !data.isEmpty else { throw CoachAPIError.upstream("empty_audio") }
         return data
     }
@@ -119,16 +151,7 @@ struct CoachAPI: Sendable {
     /// Throws on transport failures so the caller can tell "no plan yet" apart
     /// from "couldn't reach the server" and keep its cache in the second case.
     func activePlan() async throws -> PlanWire? {
-        guard let url = planURL else { throw CoachAPIError.notConfigured }
-
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(sharedSecret)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 20
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw CoachAPIError.http(status: http.statusCode)
-        }
+        let data = try await send(authorized(planURL, timeout: 20))
         return try JSONDecoder().decode(PlanEnvelope.self, from: data).plan
     }
 
@@ -143,17 +166,9 @@ struct CoachAPI: Sendable {
         var catalogue: [ExerciseCatalogItem] = []
 
         while true {
-            guard let url = catalogURL(limit: pageSize, offset: offset) else {
-                throw CoachAPIError.notConfigured
-            }
-            var request = URLRequest(url: url)
-            request.setValue("Bearer \(sharedSecret)", forHTTPHeaderField: "Authorization")
-            request.timeoutInterval = 20
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                throw CoachAPIError.http(status: http.statusCode)
-            }
+            let data = try await send(
+                authorized(catalogURL(limit: pageSize, offset: offset), timeout: 20)
+            )
             let page = try JSONDecoder().decode(ExerciseCatalogPageWire.self, from: data)
             catalogue.append(contentsOf: page.items)
             guard let next = page.nextOffset else { break }
