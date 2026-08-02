@@ -78,9 +78,6 @@ struct ExerciseLibraryView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Theme.cardSpacing) {
                     safetySummary
-                    #if DEBUG
-                    riveLabTeaser
-                    #endif
                     searchField
                     if !usesServerCatalog {
                         levelFilters
@@ -146,41 +143,6 @@ struct ExerciseLibraryView: View {
             }
         }
     }
-
-    #if DEBUG
-    private var riveLabTeaser: some View {
-        Button {
-            path.append(.riveLab)
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "figure.strengthtraining.traditional")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(Theme.primary)
-                    .frame(width: 42, height: 42)
-                    .background(Circle().fill(Theme.lightOrange))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Rive 动作状态机实验")
-                        .font(Theme.bodyStrong)
-                        .foregroundStyle(Theme.mainText)
-                    Text("切换 Beginner / Intermediate / Expert")
-                        .font(Theme.caption)
-                        .foregroundStyle(Theme.secondaryText)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.secondaryText)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .card()
-        .accessibilityIdentifier("rive-lab-entry")
-    }
-    #endif
 
     private var safetySummary: some View {
         HStack(alignment: .center, spacing: 12) {
