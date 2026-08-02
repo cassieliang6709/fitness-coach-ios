@@ -31,12 +31,23 @@ final class SpeechRecognizer {
     /// service dropped, a call came in. Cleared at the start of every attempt.
     private(set) var lastFailure: String?
 
-    /// Seconds of silence before the turn is considered finished. The lead-in
-    /// is longer because it covers the user deciding what to say — partial
-    /// results only start once they actually speak, so a 1.6s window here shut
-    /// the mic off while people were still thinking.
+    /// Who decides the turn is over.
+    enum TurnBoundary {
+        /// The user's finger — press to talk, release to send. Nothing is
+        /// inferred, so there are no timers and no way to be cut off early.
+        case held
+        /// Inferred from silence, for a mic that was tapped rather than held.
+        case silence
+    }
+
+    /// Seconds of silence before a `.silence` turn is considered finished. The
+    /// lead-in is longer because it covers the user deciding what to say —
+    /// partial results only start once they actually speak, so a 1.6s window
+    /// here shut the mic off while people were still thinking.
     private let leadInTimeout: TimeInterval = 5
     private let silenceTimeout: TimeInterval = 1.6
+
+    private var boundary: TurnBoundary = .silence
 
     private let recognizer: SFSpeechRecognizer?
     private let engine = AVAudioEngine()
@@ -88,7 +99,7 @@ final class SpeechRecognizer {
 
     /// Starts listening. `onFinish` fires once with the final transcript —
     /// empty if the user said nothing.
-    func start(onFinish: @escaping (String) -> Void) {
+    func start(boundary: TurnBoundary = .silence, onFinish: @escaping (String) -> Void) {
         // Hand this caller back its turn, but leave the in-flight recording's
         // own callback alone so the turn already running still delivers.
         guard !isRecording else {
@@ -98,6 +109,7 @@ final class SpeechRecognizer {
         }
 
         self.onFinish = onFinish
+        self.boundary = boundary
         transcript = ""
         lastFailure = nil
 
@@ -147,16 +159,18 @@ final class SpeechRecognizer {
         }
 
         isRecording = true
-        armSilenceTimer(after: leadInTimeout)
+        // A held turn ends when the finger lifts, so silence means nothing here
+        // — the user is allowed to think for as long as they keep holding.
+        if boundary == .silence { armSilenceTimer(after: leadInTimeout) }
 
         task = recognizer.recognitionTask(with: request) { [weak self] result, error in
             Task { @MainActor [weak self] in
                 guard let self, self.isRecording else { return }
                 if let result {
                     self.transcript = result.bestTranscription.formattedString
-                    if result.isFinal {
+                    if result.isFinal, self.boundary == .silence {
                         self.finish()
-                    } else {
+                    } else if self.boundary == .silence {
                         self.armSilenceTimer(after: self.silenceTimeout)
                     }
                 } else if error != nil {

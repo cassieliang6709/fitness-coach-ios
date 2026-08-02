@@ -266,9 +266,15 @@ private struct HomeInputBar: View {
         .animation(.easeInOut(duration: 0.2), value: thread.lastError)
     }
 
-    /// While listening, the words as they land; otherwise why the last attempt
-    /// came back empty.
+    /// While the mic is open, the words as they land; otherwise why the last
+    /// attempt came back empty.
     private var status: String? {
+        if thread.isHolding {
+            if thread.isCancelingHold { return "松开取消" }
+            return thread.partialTranscript.isEmpty
+                ? "松开发送 · 上滑取消"
+                : thread.partialTranscript
+        }
         if thread.voiceState == .listening {
             return thread.partialTranscript.isEmpty ? "在听…" : thread.partialTranscript
         }
@@ -301,18 +307,7 @@ private struct HomeInputBar: View {
             .background(Capsule(style: .continuous).fill(Theme.surface))
             .overlay(Capsule(style: .continuous).strokeBorder(Theme.border, lineWidth: 1))
 
-            IconButton(
-                symbol: thread.voiceState == .idle ? "mic.fill" : "stop.fill",
-                tint: thread.voiceState == .idle ? Theme.primary : .white,
-                background: thread.voiceState == .idle ? Theme.lightOrange : Theme.primary
-            ) {
-                if thread.voiceState == .idle {
-                    thread.beginVoiceTurn()
-                } else {
-                    thread.cancelVoiceTurn()
-                }
-            }
-            .accessibilityLabel(thread.voiceState == .idle ? "开始语音" : "取消语音")
+            PushToTalkButton(thread: thread, diameter: Theme.tapTarget)
         }
     }
 

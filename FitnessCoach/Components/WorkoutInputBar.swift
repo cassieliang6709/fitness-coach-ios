@@ -20,7 +20,13 @@ struct WorkoutInputBar: View {
                 .transition(.opacity)
             }
 
-            if let label = thread.voiceState.label {
+            if thread.isHolding {
+                PushToTalkHint(
+                    holding: true,
+                    willCancel: thread.isCancelingHold,
+                    transcript: thread.partialTranscript
+                )
+            } else if let label = thread.voiceState.label {
                 VStack(spacing: 4) {
                     Text(label)
                         .font(.system(size: 13, weight: .medium))
@@ -67,6 +73,7 @@ struct WorkoutInputBar: View {
         .animation(.easeInOut(duration: 0.15), value: thread.partialTranscript)
         .animation(.easeInOut(duration: 0.2), value: thread.voiceNotice)
         .animation(.easeInOut(duration: 0.2), value: thread.lastError)
+        .animation(.easeInOut(duration: 0.2), value: thread.isHolding)
     }
 
     // MARK: - Rows
@@ -77,13 +84,7 @@ struct WorkoutInputBar: View {
 
             Spacer()
 
-            VoiceInputButton(state: thread.voiceState) {
-                if thread.voiceState == .idle {
-                    thread.beginVoiceTurn()
-                } else {
-                    thread.cancelVoiceTurn()
-                }
-            }
+            PushToTalkButton(thread: thread)
 
             Spacer()
 

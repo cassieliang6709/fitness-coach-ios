@@ -146,6 +146,66 @@ final class CoachThread {
         }
     }
 
+    // MARK: - Hold to talk
+
+    /// Press-and-hold dictation. The finger marks both ends of the turn, so
+    /// nothing is inferred from silence — the user can pause mid-sentence, or
+    /// think for ten seconds before speaking, and the mic stays open.
+    func beginHold() {
+        // Barging in mid-reply is the point of a hold button: the user has
+        // something to say now. Cut the coach off rather than swallowing the
+        // press, which reads as the mic being broken.
+        if isBusy || work != nil {
+            cancelVoiceTurn()
+        }
+        guard !isBusy, work == nil else { return }
+        // No recognizer (simulator, UI tests): there is no audio to hold, so
+        // the press itself is the whole turn and the script runs now. Waiting
+        // for the release would push it past the moment the press was accepted.
+        guard let speech else {
+            beginVoiceTurn()
+            return
+        }
+        voiceNotice = nil
+        clearError()
+
+        work = Task {
+            if speech.availability != .ready { await speech.requestAccess() }
+            guard case .ready = speech.availability else {
+                voiceNotice = speechFailureMessage
+                finishWork()
+                return
+            }
+            // The press may already be over — the permission dialog can outlast
+            // it on the very first hold. Don't open a mic nobody is holding.
+            guard isHolding else {
+                finishWork()
+                return
+            }
+            listen(with: speech, boundary: .held)
+            finishWork()
+        }
+    }
+
+    /// Finger lifted inside the button: deliver what was heard. Nothing to do
+    /// on the demo path — `beginHold` already ran the whole scripted turn.
+    func endHold() {
+        guard let speech, speech.isRecording else { return }
+        speech.stop()
+    }
+
+    /// Finger slid away from the button: throw the turn away without sending.
+    func cancelHold() {
+        voiceNotice = nil
+        speech?.cancel()
+        voiceState = .idle
+    }
+
+    /// Set by the button. `isHolding` also lets an in-flight permission prompt
+    /// tell whether the press it belongs to is still active.
+    var isHolding = false
+    var isCancelingHold = false
+
     private var speechFailureMessage: String {
         if case .unavailable(let reason) = speech?.availability { return reason }
         return "语音暂时不可用"
@@ -165,9 +225,12 @@ final class CoachThread {
     }
 
     /// Opens the mic and hands the final transcript to the coach.
-    private func listen(with speech: SpeechRecognizer) {
+    private func listen(
+        with speech: SpeechRecognizer,
+        boundary: SpeechRecognizer.TurnBoundary = .silence
+    ) {
         voiceState = .listening
-        speech.start { [weak self] transcript in
+        speech.start(boundary: boundary) { [weak self] transcript in
             guard let self else { return }
             guard !transcript.isEmpty else {
                 // Nothing heard. Say why — a mic that closes in silence looks
