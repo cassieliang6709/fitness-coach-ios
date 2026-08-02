@@ -273,6 +273,9 @@ final class WorkoutSession {
             exerciseCatalog = items
         } catch {
             catalogError = error.localizedDescription
+            #if DEBUG
+            print("Exercise catalogue sync failed: \(error)")
+            #endif
         }
     }
 

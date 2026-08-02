@@ -79,6 +79,11 @@ final class WorkoutFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["臀桥"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.images["exercise-specific-artwork-glute-bridge"].exists)
 
+        if app.keyboards.firstMatch.exists {
+            app.keyboards.firstMatch.swipeDown()
+        }
+        app.swipeUp()
+
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "exercise-library-glute-bridge-artwork"
         screenshot.lifetime = .keepAlways

@@ -140,6 +140,11 @@ struct ExerciseLibraryView: View {
                 .padding(.bottom, 24)
             }
         }
+        .task {
+            if session.exerciseCatalog.isEmpty {
+                await session.syncExerciseCatalog()
+            }
+        }
     }
 
     #if DEBUG
