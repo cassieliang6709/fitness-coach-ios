@@ -17,21 +17,7 @@ struct HomeView: View {
     var body: some View {
         MobileAppShell {
             PageHeader(title: greeting, subtitle: subtitle) {
-                HStack(spacing: 8) {
-                    // Entry to the MiniMax realtime path. Separate from the
-                    // mic in the input bar below, which is on-device dictation
-                    // into the text coach — this one is a live voice call.
-                    IconButton(
-                        symbol: "waveform",
-                        tint: Theme.primary,
-                        background: Theme.lightOrange
-                    ) {
-                        path.append(.realtime)
-                    }
-                    .accessibilityLabel("实时语音陪练")
-
-                    Mascot(pose: tab == .chat ? .listening : .idle, size: 42)
-                }
+                Mascot(pose: tab == .chat ? .listening : .idle, size: 42)
             }
 
             switch tab {
