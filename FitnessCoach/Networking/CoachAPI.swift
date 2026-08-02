@@ -22,10 +22,27 @@ struct CoachAPI: Sendable {
         return CoachAPI(host: host, sharedSecret: secret)
     }
 
-    private var turnURL: URL? {
-        // The scheme lives here rather than in the xcconfig — "//" starts a
-        // comment in xcconfig files and would silently truncate the value.
-        URL(string: "https://\(host)/coach/turn")
+    /// The scheme lives here rather than in the xcconfig — "//" starts a
+    /// comment in xcconfig files and would silently truncate the value.
+    private func url(path: String) -> URL? {
+        var components = URLComponents(string: "https://\(host)\(path)")
+        components?.queryItems = [URLQueryItem(name: "user", value: InstallIdentity.current)]
+        return components?.url
+    }
+
+    private var turnURL: URL? { url(path: "/coach/turn") }
+    private var planURL: URL? { url(path: "/plan") }
+    private var speechURL: URL? { url(path: "/speech") }
+
+    private func catalogURL(limit: Int, offset: Int) -> URL? {
+        guard var components = URLComponents(string: "https://\(host)/exercises") else {
+            return nil
+        }
+        components.queryItems = [
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "offset", value: String(offset)),
+        ]
+        return components.url
     }
 
     func stream(_ request: CoachTurnRequest) -> AsyncThrowingStream<CoachEvent, Error> {
@@ -75,6 +92,78 @@ struct CoachAPI: Sendable {
         }
     }
 
+    /// Voices the coach's exact final reply. MiniMax is a TTS provider here,
+    /// not a second model that can alter what the user already sees on screen.
+    func synthesizeSpeech(_ text: String) async throws -> Data {
+        guard let url = speechURL else { throw CoachAPIError.notConfigured }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(sharedSecret)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("audio/mpeg", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 30
+        request.httpBody = try JSONEncoder().encode(SpeechRequest(text: text))
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw CoachAPIError.http(status: http.statusCode)
+        }
+        guard !data.isEmpty else { throw CoachAPIError.upstream("empty_audio") }
+        return data
+    }
+
+    // MARK: - Plan
+
+    /// The user's active plan, or nil when they have never had one generated.
+    /// Throws on transport failures so the caller can tell "no plan yet" apart
+    /// from "couldn't reach the server" and keep its cache in the second case.
+    func activePlan() async throws -> PlanWire? {
+        guard let url = planURL else { throw CoachAPIError.notConfigured }
+
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(sharedSecret)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 20
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw CoachAPIError.http(status: http.statusCode)
+        }
+        return try JSONDecoder().decode(PlanEnvelope.self, from: data).plan
+    }
+
+    private struct PlanEnvelope: Decodable { let plan: PlanWire? }
+    private struct SpeechRequest: Encodable { let text: String }
+
+    /// Loads the entire D1 catalogue in bounded pages. There are currently
+    /// around 1.3k rows, so this is three requests rather than one huge body.
+    func exerciseCatalog() async throws -> [ExerciseCatalogItem] {
+        let pageSize = 500
+        var offset = 0
+        var catalogue: [ExerciseCatalogItem] = []
+
+        while true {
+            guard let url = catalogURL(limit: pageSize, offset: offset) else {
+                throw CoachAPIError.notConfigured
+            }
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(sharedSecret)", forHTTPHeaderField: "Authorization")
+            request.timeoutInterval = 20
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                throw CoachAPIError.http(status: http.statusCode)
+            }
+            let page = try JSONDecoder().decode(ExerciseCatalogPageWire.self, from: data)
+            catalogue.append(contentsOf: page.items)
+            guard let next = page.nextOffset else { break }
+            guard next > offset else { throw CoachAPIError.upstream("invalid_catalog_page") }
+            offset = next
+        }
+
+        return catalogue
+    }
+
     // MARK: - SSE decoding
 
     private enum Classified {
@@ -108,6 +197,12 @@ struct CoachAPI: Sendable {
         case "refusal":
             let body = try? decoder.decode(RefusalPayload.self, from: payload)
             return .refusal(category: body?.category)
+        case "plan":
+            guard let body = try? decoder.decode(PlanWire.self, from: payload) else { return nil }
+            return .plan(body)
+        case "plan_error":
+            let body = try? decoder.decode(PlanErrorPayload.self, from: payload)
+            return .planError(reason: body?.reason ?? "计划没有通过校验")
         case "done":
             return .done
         default:
@@ -122,5 +217,6 @@ struct CoachAPI: Sendable {
         let input: JSONValue
     }
     private struct RefusalPayload: Decodable { let category: String? }
+    private struct PlanErrorPayload: Decodable { let reason: String? }
     private struct ErrorPayload: Decodable { let message: String? }
 }

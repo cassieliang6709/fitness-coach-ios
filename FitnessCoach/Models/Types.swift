@@ -38,6 +38,12 @@ struct Exercise: Identifiable, Hashable {
     var weight: Double?
     var sideBased: Bool = false
     var alternative: String?
+    /// Metadata returned by the server-backed exercise catalogue. The curated
+    /// local catalogue remains the first choice; these fields keep generated
+    /// plans connected when the server uses a broader movement set.
+    var bodyPart: String?
+    var equipment: String?
+    var coachingTips: [String] = []
 
     /// "4 × 12" or "3 × 10 / 侧"
     var volumeLabel: String {
@@ -48,6 +54,51 @@ struct Exercise: Identifiable, Hashable {
         guard let weight else { return nil }
         return "建议重量 \(Format.kg(weight))"
     }
+
+    var libraryMuscleLabel: String? {
+        if let local = ExerciseCatalog.exercise(id: id) { return local.muscleLabel }
+        guard let bodyPart else { return nil }
+        return Self.bodyPartLabels[bodyPart] ?? bodyPart
+    }
+
+    var libraryEquipmentLabel: String? {
+        if let local = ExerciseCatalog.exercise(id: id) { return local.equipmentLabel }
+        guard let equipment else { return nil }
+        return Self.equipmentLabels[equipment] ?? equipment
+    }
+
+    var libraryCoachingTips: [String] {
+        ExerciseCatalog.exercise(id: id)?.coachingTips ?? coachingTips
+    }
+
+    private static let bodyPartLabels: [String: String] = [
+        "upper legs": "臀腿",
+        "lower legs": "小腿",
+        "waist": "核心",
+        "chest": "胸",
+        "back": "背",
+        "shoulders": "肩",
+        "upper arms": "手臂",
+        "lower arms": "前臂",
+        "cardio": "心肺",
+        "neck": "颈部",
+    ]
+
+    private static let equipmentLabels: [String: String] = [
+        "body weight": "自重",
+        "dumbbell": "哑铃",
+        "barbell": "杠铃",
+        "cable": "龙门架",
+        "band": "弹力带",
+        "kettlebell": "壶铃",
+        "leverage machine": "固定器械",
+        "smith machine": "史密斯机",
+        "stability ball": "健身球",
+        "medicine ball": "药球",
+        "elliptical machine": "椭圆机",
+        "stationary bike": "固定单车",
+        "assisted": "辅助器械",
+    ]
 }
 
 enum SectionKind: String, Hashable {
@@ -131,16 +182,29 @@ enum ChatRole: Hashable {
     case assistant
 }
 
+enum ChatMessageKind: Hashable {
+    case text
+    case generatedPlan
+}
+
 struct ChatMessage: Identifiable, Hashable {
     let id: String
     let role: ChatRole
+    let kind: ChatMessageKind
     /// Mutable: streamed replies grow a single bubble instead of appending many.
     var content: String
     let timestamp: Date
 
-    init(id: String = UUID().uuidString, role: ChatRole, content: String, timestamp: Date = .now) {
+    init(
+        id: String = UUID().uuidString,
+        role: ChatRole,
+        kind: ChatMessageKind = .text,
+        content: String,
+        timestamp: Date = .now
+    ) {
         self.id = id
         self.role = role
+        self.kind = kind
         self.content = content
         self.timestamp = timestamp
     }

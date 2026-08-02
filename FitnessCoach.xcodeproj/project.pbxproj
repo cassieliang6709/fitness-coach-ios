@@ -9,10 +9,15 @@
 /* Begin PBXBuildFile section */
 		168E3B6ED12354B41CCADFDA /* WorkoutSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E978E9CEC3D2D0FF70DDD8EF /* WorkoutSession.swift */; };
 		1919BAA9CACE7F394BB378CB /* ChatThread.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0FBB6446BD083F19DF5982A /* ChatThread.swift */; };
+		1DF1DF20F3BFFF5EE4A1B0F8 /* RealtimeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 523D8975A48E49FA15ADE7C4 /* RealtimeSession.swift */; };
 		2005D8A5838921F183FD56BB /* LegDayDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE6F9CFAC97BDD6AE7500AA /* LegDayDetailView.swift */; };
+		20E6E9D5DF5FFD2F0BE3BF4E /* LocalRiveMascot.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA073DD55B483A020EC5FB53 /* LocalRiveMascot.swift */; };
 		2376C0B3BA53D4FCE15F3F7B /* PageHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6C6CD9EE820ACD76394A65F /* PageHeader.swift */; };
 		2810E4061AC3F3B1775B47B5 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22BE20B857330F9517F95821 /* WelcomeView.swift */; };
 		28EE9966883EFD921D706921 /* ChatBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63C385FE695DB0227FB45E8C /* ChatBubble.swift */; };
+		2EFF71FE9B18F7D2C7A1DEA3 /* RealtimeWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AFFF5FAEBB58488F7494914 /* RealtimeWire.swift */; };
+		37BE1763E5C6AA9B87964F97 /* PlanWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B543F7DE3E8830985DB62FF /* PlanWire.swift */; };
+		3AE3544EE02441ACA4A57F26 /* LICENSE-RIVE-IOS.txt in Resources */ = {isa = PBXBuildFile; fileRef = 465870AD592B2CA5E5C064BE /* LICENSE-RIVE-IOS.txt */; };
 		3BC1CCBFF0B5514525524732 /* CapsuleTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4794167C9A4CC2AD580879CF /* CapsuleTabBar.swift */; };
 		40DFC92944A4B8F7F38A9770 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09F816905C35AB68C054EB7A /* Profile.swift */; };
 		41A66281F004044A0BD50C5C /* Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8856D845B81027E97CE9FA80 /* Types.swift */; };
@@ -25,28 +30,44 @@
 		64957680C0E6BC7E5F3CCC9C /* AIStyleSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 914915B268EE287F23DBF918 /* AIStyleSelector.swift */; };
 		68610DED597F1CD3C4031EAF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1B618CBF39FF185F6B3E9A1B /* Assets.xcassets */; };
 		707850155AACB74E6BC3B4A7 /* WorkoutInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6873837BE6BB59BC6C4B58C /* WorkoutInputBar.swift */; };
+		725A1C0AC05F7207252CEB26 /* RealtimeAudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE17844FDC00B74D0DE4C12E /* RealtimeAudioEngine.swift */; };
 		73641F93C3733087B2B97724 /* WorkoutFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DDD6DAE91577C1405E076F /* WorkoutFlowUITests.swift */; };
 		748D17F3A544100BFA0F6757 /* CoachAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3A31345BE42DB570477C73E /* CoachAPI.swift */; };
+		75A96BEEBB2B76E4E16BE8B8 /* RealtimeCoachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 511011AE0FEB476C86368E70 /* RealtimeCoachView.swift */; };
 		7784E73CCA29405FA322657E /* MobileAppShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = F181001AD622C3599406E4F1 /* MobileAppShell.swift */; };
 		7CE62C8AF35FBE84C9F0FE01 /* OptionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24C5A63B0EAE438ED9A218B /* OptionCard.swift */; };
 		84BAA0D35C17D81798D5A915 /* WorkoutStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28A35726AC4C8F78B9B472F7 /* WorkoutStore.swift */; };
 		91F21F549EF0ED897A3A4585 /* Mascot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 317F95849E3471B16D690E4C /* Mascot.swift */; };
 		94D47636CF2255B287C09EF0 /* ExerciseList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039CDDC6FF8960B651935C04 /* ExerciseList.swift */; };
 		969EFCB37581CFCC247FF7BD /* StrengthCoachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5BAE0DC3EC8704DFEBDBEDD /* StrengthCoachView.swift */; };
+		9C012098591F114497AEFD2F /* AnimatedMascot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D64867C7E2108311FCD80418 /* AnimatedMascot.swift */; };
+		9D40B84F60235DD4E0FB932A /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 1CA518FE2897866F2BCE097C /* README.md */; };
 		9E491709BB5135411D3E6491 /* CurrentTaskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A936D67F647772F0BAEFC4 /* CurrentTaskCard.swift */; };
 		9E5F9F2D5FE8CB69EAD94F69 /* WeekStripe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE8EA3349C9A124ACDD19CB /* WeekStripe.swift */; };
 		A27D4B2E24610CACF07D2A42 /* FitnessCoachApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9005938F3A0D0909538D19A9 /* FitnessCoachApp.swift */; };
+		AB559ECB32DD48AD829C9285 /* RiveRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 45F14E53485F95B04B78F66C /* RiveRuntime */; };
+		B409F1A3A4BB7379586A2CFB /* GymPhotoScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C1263DC430C198B2D6D84E /* GymPhotoScanner.swift */; };
+		B9BEB23711901B6A0A61CFB3 /* CoachSpeechPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1408723B97FE7F5F6973D66B /* CoachSpeechPlayer.swift */; };
 		C525458FC887F311B87EC63A /* ReviewSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86935C950F228D9CF4038BAF /* ReviewSummary.swift */; };
 		CB95C50874D8047E43088C68 /* PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09115B9CFAEAA51EBC563F2C /* PrimaryButton.swift */; };
 		D2B421742496358634F98A96 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB22B9F7B6C288203F121427 /* Theme.swift */; };
+		D3E6710624573691F2E9A5A7 /* PlanCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36AF4FE9E68D3BFCE89DBD51 /* PlanCache.swift */; };
 		D770C7998D3AA95DD1B46318 /* SpeechRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 261FA6B31E54B2A7C8C2C7C6 /* SpeechRecognizer.swift */; };
 		DA6E8FBEE3B0F546BEB2C0CC /* PlanLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4FDFDC0FE418A2D0943ACF8 /* PlanLibraryView.swift */; };
 		DCA1913090F7271B2AD78F7E /* MemoryChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DD68254FCF2AB8DA1DCD6A1 /* MemoryChip.swift */; };
+		DE7BC2366117279DE34DEE8F /* ExerciseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F5683CD743FE2FDEC6881E /* ExerciseDetailView.swift */; };
+		DE9E82F5309F30470B01F8D5 /* ExerciseLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C4E4CDD723E24CEBCA29B3B /* ExerciseLibraryView.swift */; };
+		E1571016F6252030F3FB0B33 /* rive-skills-demo.riv in Resources */ = {isa = PBXBuildFile; fileRef = 0B3A3C2DB991CECEE14A022E /* rive-skills-demo.riv */; };
 		E69A458744AAB90522803E6C /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8560F3CD69082762918E9ED4 /* ReviewView.swift */; };
 		ED333BC0DEF5B510E3D53110 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E2693C4FF48A349E00D0428 /* RootView.swift */; };
+		ED85744B4B2E2297C62165C1 /* ExerciseCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 432CACC864D0D08533A46F15 /* ExerciseCatalog.swift */; };
+		EE79989F6077699BC025ED5A /* RiveLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3574E651A1A2E3BD1B4CB98F /* RiveLabView.swift */; };
 		EF735AF0079324D3F4101BD7 /* MockData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70A19FD42D2B1266ED635357 /* MockData.swift */; };
 		EFDC024E5C799E29DBB7D1EF /* PlanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29C882A2C23022537AF8DA78 /* PlanCard.swift */; };
+		F1D367A41282EA539E659E14 /* GymVision.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB9C0B2EE58D13298C677F7 /* GymVision.swift */; };
+		FAFC298F1430699ADEBF379B /* ExerciseCatalogWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = A43156F3FBCC6A7941140EA3 /* ExerciseCatalogWire.swift */; };
 		FB5DAD1A355F748FE0B84341 /* CoachThread.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279DE87CE682310E78C9E3E5 /* CoachThread.swift */; };
+		FBDF3C950AACFB21506B21E6 /* InstallIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DAAD536E282B8AA448A8BCC /* InstallIdentity.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,25 +84,39 @@
 		039CDDC6FF8960B651935C04 /* ExerciseList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseList.swift; sourceTree = "<group>"; };
 		09115B9CFAEAA51EBC563F2C /* PrimaryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimaryButton.swift; sourceTree = "<group>"; };
 		09F816905C35AB68C054EB7A /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
+		0B3A3C2DB991CECEE14A022E /* rive-skills-demo.riv */ = {isa = PBXFileReference; path = "rive-skills-demo.riv"; sourceTree = "<group>"; };
 		0EE6F9CFAC97BDD6AE7500AA /* LegDayDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegDayDetailView.swift; sourceTree = "<group>"; };
+		1408723B97FE7F5F6973D66B /* CoachSpeechPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachSpeechPlayer.swift; sourceTree = "<group>"; };
 		1B618CBF39FF185F6B3E9A1B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1CA518FE2897866F2BCE097C /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		22BE20B857330F9517F95821 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		261FA6B31E54B2A7C8C2C7C6 /* SpeechRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognizer.swift; sourceTree = "<group>"; };
 		279DE87CE682310E78C9E3E5 /* CoachThread.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachThread.swift; sourceTree = "<group>"; };
 		28A35726AC4C8F78B9B472F7 /* WorkoutStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutStore.swift; sourceTree = "<group>"; };
 		29C882A2C23022537AF8DA78 /* PlanCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCard.swift; sourceTree = "<group>"; };
+		2AFFF5FAEBB58488F7494914 /* RealtimeWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeWire.swift; sourceTree = "<group>"; };
 		317F95849E3471B16D690E4C /* Mascot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mascot.swift; sourceTree = "<group>"; };
 		329D1EF386C07A0F49B5C129 /* WorkoutProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutProgress.swift; sourceTree = "<group>"; };
+		3574E651A1A2E3BD1B4CB98F /* RiveLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RiveLabView.swift; sourceTree = "<group>"; };
+		36AF4FE9E68D3BFCE89DBD51 /* PlanCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCache.swift; sourceTree = "<group>"; };
 		3F37A793A9B76091E40B4BC4 /* TrainingStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingStats.swift; sourceTree = "<group>"; };
+		432CACC864D0D08533A46F15 /* ExerciseCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseCatalog.swift; sourceTree = "<group>"; };
 		459216042D2D79EAC02C1F79 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		465870AD592B2CA5E5C064BE /* LICENSE-RIVE-IOS.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "LICENSE-RIVE-IOS.txt"; sourceTree = "<group>"; };
+		46F5683CD743FE2FDEC6881E /* ExerciseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseDetailView.swift; sourceTree = "<group>"; };
 		4794167C9A4CC2AD580879CF /* CapsuleTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapsuleTabBar.swift; sourceTree = "<group>"; };
+		4B543F7DE3E8830985DB62FF /* PlanWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanWire.swift; sourceTree = "<group>"; };
 		4C00A20E3FE5CA88E74CD4EA /* CardioCoachView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardioCoachView.swift; sourceTree = "<group>"; };
 		4E2693C4FF48A349E00D0428 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		4EAEF8E29C86B03176E3121C /* CoachWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachWire.swift; sourceTree = "<group>"; };
+		511011AE0FEB476C86368E70 /* RealtimeCoachView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeCoachView.swift; sourceTree = "<group>"; };
+		523D8975A48E49FA15ADE7C4 /* RealtimeSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeSession.swift; sourceTree = "<group>"; };
+		5DB9C0B2EE58D13298C677F7 /* GymVision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymVision.swift; sourceTree = "<group>"; };
 		5FE8EA3349C9A124ACDD19CB /* WeekStripe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekStripe.swift; sourceTree = "<group>"; };
 		62A936D67F647772F0BAEFC4 /* CurrentTaskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrentTaskCard.swift; sourceTree = "<group>"; };
 		63C385FE695DB0227FB45E8C /* ChatBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubble.swift; sourceTree = "<group>"; };
 		70A19FD42D2B1266ED635357 /* MockData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockData.swift; sourceTree = "<group>"; };
+		7DAAD536E282B8AA448A8BCC /* InstallIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallIdentity.swift; sourceTree = "<group>"; };
 		8560F3CD69082762918E9ED4 /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
 		86935C950F228D9CF4038BAF /* ReviewSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewSummary.swift; sourceTree = "<group>"; };
 		8856D845B81027E97CE9FA80 /* Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Types.swift; sourceTree = "<group>"; };
@@ -90,11 +125,17 @@
 		9005938F3A0D0909538D19A9 /* FitnessCoachApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessCoachApp.swift; sourceTree = "<group>"; };
 		914915B268EE287F23DBF918 /* AIStyleSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIStyleSelector.swift; sourceTree = "<group>"; };
 		9AFBE4284C22662D41B46887 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9C4E4CDD723E24CEBCA29B3B /* ExerciseLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibraryView.swift; sourceTree = "<group>"; };
+		A0C1263DC430C198B2D6D84E /* GymPhotoScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymPhotoScanner.swift; sourceTree = "<group>"; };
 		A0DDD6DAE91577C1405E076F /* WorkoutFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutFlowUITests.swift; sourceTree = "<group>"; };
+		A43156F3FBCC6A7941140EA3 /* ExerciseCatalogWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseCatalogWire.swift; sourceTree = "<group>"; };
 		A5BAE0DC3EC8704DFEBDBEDD /* StrengthCoachView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrengthCoachView.swift; sourceTree = "<group>"; };
 		B24C5A63B0EAE438ED9A218B /* OptionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionCard.swift; sourceTree = "<group>"; };
 		C6873837BE6BB59BC6C4B58C /* WorkoutInputBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutInputBar.swift; sourceTree = "<group>"; };
+		CA073DD55B483A020EC5FB53 /* LocalRiveMascot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalRiveMascot.swift; sourceTree = "<group>"; };
+		D64867C7E2108311FCD80418 /* AnimatedMascot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedMascot.swift; sourceTree = "<group>"; };
 		D887113113D8382470DF1A11 /* FitnessCoachUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FitnessCoachUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DE17844FDC00B74D0DE4C12E /* RealtimeAudioEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeAudioEngine.swift; sourceTree = "<group>"; };
 		E0D0EF8C7D7780B5C07D74D0 /* FitnessCoach.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FitnessCoach.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E0FBB6446BD083F19DF5982A /* ChatThread.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatThread.swift; sourceTree = "<group>"; };
 		E3A31345BE42DB570477C73E /* CoachAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachAPI.swift; sourceTree = "<group>"; };
@@ -103,8 +144,19 @@
 		E978E9CEC3D2D0FF70DDD8EF /* WorkoutSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSession.swift; sourceTree = "<group>"; };
 		F181001AD622C3599406E4F1 /* MobileAppShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAppShell.swift; sourceTree = "<group>"; };
 		FB22B9F7B6C288203F121427 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		"TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		"TEMP_A703722A-FC7B-4DC4-A910-19E43CDC9E99" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		86BC428C39D727E1DE3B309E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AB559ECB32DD48AD829C9285 /* RiveRuntime in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		049B8385E152ACEF3A300174 /* FitnessCoach */ = {
@@ -116,6 +168,7 @@
 				4E9E99D15F2F5C50E3F894A7 /* Models */,
 				6CABDF7443BCB08427314CF3 /* Networking */,
 				C9506580C16FA36E5B8F45ED /* Persistence */,
+				6D04D6CF33221752A8181F09 /* Realtime */,
 				B313C3EF1808C248CC0CDFE0 /* Resources */,
 				0D943CE4B497E90C9380B15E /* Screens */,
 				79F20949A4C76ECBC20E4146 /* Speech */,
@@ -129,10 +182,14 @@
 			isa = PBXGroup;
 			children = (
 				4C00A20E3FE5CA88E74CD4EA /* CardioCoachView.swift */,
+				46F5683CD743FE2FDEC6881E /* ExerciseDetailView.swift */,
+				9C4E4CDD723E24CEBCA29B3B /* ExerciseLibraryView.swift */,
 				459216042D2D79EAC02C1F79 /* HomeView.swift */,
 				0EE6F9CFAC97BDD6AE7500AA /* LegDayDetailView.swift */,
 				E4FDFDC0FE418A2D0943ACF8 /* PlanLibraryView.swift */,
+				511011AE0FEB476C86368E70 /* RealtimeCoachView.swift */,
 				8560F3CD69082762918E9ED4 /* ReviewView.swift */,
+				3574E651A1A2E3BD1B4CB98F /* RiveLabView.swift */,
 				A5BAE0DC3EC8704DFEBDBEDD /* StrengthCoachView.swift */,
 				22BE20B857330F9517F95821 /* WelcomeView.swift */,
 			);
@@ -170,11 +227,14 @@
 			isa = PBXGroup;
 			children = (
 				914915B268EE287F23DBF918 /* AIStyleSelector.swift */,
+				D64867C7E2108311FCD80418 /* AnimatedMascot.swift */,
 				4794167C9A4CC2AD580879CF /* CapsuleTabBar.swift */,
 				63C385FE695DB0227FB45E8C /* ChatBubble.swift */,
 				E0FBB6446BD083F19DF5982A /* ChatThread.swift */,
 				62A936D67F647772F0BAEFC4 /* CurrentTaskCard.swift */,
 				039CDDC6FF8960B651935C04 /* ExerciseList.swift */,
+				A0C1263DC430C198B2D6D84E /* GymPhotoScanner.swift */,
+				CA073DD55B483A020EC5FB53 /* LocalRiveMascot.swift */,
 				317F95849E3471B16D690E4C /* Mascot.swift */,
 				8DD68254FCF2AB8DA1DCD6A1 /* MemoryChip.swift */,
 				F181001AD622C3599406E4F1 /* MobileAppShell.swift */,
@@ -193,6 +253,7 @@
 		4E9E99D15F2F5C50E3F894A7 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				432CACC864D0D08533A46F15 /* ExerciseCatalog.swift */,
 				70A19FD42D2B1266ED635357 /* MockData.swift */,
 				09F816905C35AB68C054EB7A /* Profile.swift */,
 				3F37A793A9B76091E40B4BC4 /* TrainingStats.swift */,
@@ -206,21 +267,48 @@
 			children = (
 				E3A31345BE42DB570477C73E /* CoachAPI.swift */,
 				4EAEF8E29C86B03176E3121C /* CoachWire.swift */,
+				A43156F3FBCC6A7941140EA3 /* ExerciseCatalogWire.swift */,
+				5DB9C0B2EE58D13298C677F7 /* GymVision.swift */,
+				7DAAD536E282B8AA448A8BCC /* InstallIdentity.swift */,
+				36AF4FE9E68D3BFCE89DBD51 /* PlanCache.swift */,
+				4B543F7DE3E8830985DB62FF /* PlanWire.swift */,
 			);
 			path = Networking;
+			sourceTree = "<group>";
+		};
+		6D04D6CF33221752A8181F09 /* Realtime */ = {
+			isa = PBXGroup;
+			children = (
+				DE17844FDC00B74D0DE4C12E /* RealtimeAudioEngine.swift */,
+				523D8975A48E49FA15ADE7C4 /* RealtimeSession.swift */,
+				2AFFF5FAEBB58488F7494914 /* RealtimeWire.swift */,
+			);
+			path = Realtime;
 			sourceTree = "<group>";
 		};
 		79F20949A4C76ECBC20E4146 /* Speech */ = {
 			isa = PBXGroup;
 			children = (
+				1408723B97FE7F5F6973D66B /* CoachSpeechPlayer.swift */,
 				261FA6B31E54B2A7C8C2C7C6 /* SpeechRecognizer.swift */,
 			);
 			path = Speech;
 			sourceTree = "<group>";
 		};
+		AEE7F13CCBCF5109ABCC28DA /* Rive */ = {
+			isa = PBXGroup;
+			children = (
+				465870AD592B2CA5E5C064BE /* LICENSE-RIVE-IOS.txt */,
+				1CA518FE2897866F2BCE097C /* README.md */,
+				0B3A3C2DB991CECEE14A022E /* rive-skills-demo.riv */,
+			);
+			path = Rive;
+			sourceTree = "<group>";
+		};
 		B313C3EF1808C248CC0CDFE0 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				AEE7F13CCBCF5109ABCC28DA /* Rive */,
 				1B618CBF39FF185F6B3E9A1B /* Assets.xcassets */,
 			);
 			path = Resources;
@@ -260,10 +348,10 @@
 			path = DesignSystem;
 			sourceTree = "<group>";
 		};
-		"TEMP_224F4EF7-B5B0-4AF0-BCD1-A1806E7F4D34" /* fitness_plan */ = {
+		"TEMP_8C631183-43F2-4DDE-A9CE-3D38B66A09E2" /* fitness_plan */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */,
+				"TEMP_A703722A-FC7B-4DC4-A910-19E43CDC9E99" /* Secrets.xcconfig */,
 			);
 			path = fitness_plan;
 			sourceTree = "<group>";
@@ -295,6 +383,7 @@
 			buildPhases = (
 				0BFFE0C3177FE6A56388E647 /* Sources */,
 				BB337F53BCBB28A69715114C /* Resources */,
+				86BC428C39D727E1DE3B309E /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -302,6 +391,7 @@
 			);
 			name = FitnessCoach;
 			packageProductDependencies = (
+				45F14E53485F95B04B78F66C /* RiveRuntime */,
 			);
 			productName = FitnessCoach;
 			productReference = E0D0EF8C7D7780B5C07D74D0 /* FitnessCoach.app */;
@@ -334,6 +424,9 @@
 			);
 			mainGroup = C8ECA02A1EB722A4444AE89D;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				E926AA5FD7A1796F41BBC0BD /* XCRemoteSwiftPackageReference "rive-ios" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0E35B05C16DCB41926369963 /* Products */;
 			projectDirPath = "";
@@ -351,6 +444,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				68610DED597F1CD3C4031EAF /* Assets.xcassets in Resources */,
+				3AE3544EE02441ACA4A57F26 /* LICENSE-RIVE-IOS.txt in Resources */,
+				9D40B84F60235DD4E0FB932A /* README.md in Resources */,
+				E1571016F6252030F3FB0B33 /* rive-skills-demo.riv in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -362,31 +458,48 @@
 			buildActionMask = 2147483647;
 			files = (
 				64957680C0E6BC7E5F3CCC9C /* AIStyleSelector.swift in Sources */,
+				9C012098591F114497AEFD2F /* AnimatedMascot.swift in Sources */,
 				3BC1CCBFF0B5514525524732 /* CapsuleTabBar.swift in Sources */,
 				5F30982605D19A4277C4DD8D /* CardioCoachView.swift in Sources */,
 				28EE9966883EFD921D706921 /* ChatBubble.swift in Sources */,
 				1919BAA9CACE7F394BB378CB /* ChatThread.swift in Sources */,
 				748D17F3A544100BFA0F6757 /* CoachAPI.swift in Sources */,
+				B9BEB23711901B6A0A61CFB3 /* CoachSpeechPlayer.swift in Sources */,
 				FB5DAD1A355F748FE0B84341 /* CoachThread.swift in Sources */,
 				4EFC75453A1F11CF86227F18 /* CoachWire.swift in Sources */,
 				9E491709BB5135411D3E6491 /* CurrentTaskCard.swift in Sources */,
+				ED85744B4B2E2297C62165C1 /* ExerciseCatalog.swift in Sources */,
+				FAFC298F1430699ADEBF379B /* ExerciseCatalogWire.swift in Sources */,
+				DE7BC2366117279DE34DEE8F /* ExerciseDetailView.swift in Sources */,
+				DE9E82F5309F30470B01F8D5 /* ExerciseLibraryView.swift in Sources */,
 				94D47636CF2255B287C09EF0 /* ExerciseList.swift in Sources */,
 				A27D4B2E24610CACF07D2A42 /* FitnessCoachApp.swift in Sources */,
+				B409F1A3A4BB7379586A2CFB /* GymPhotoScanner.swift in Sources */,
+				F1D367A41282EA539E659E14 /* GymVision.swift in Sources */,
 				460415760365B64FA378B4AE /* HomeView.swift in Sources */,
+				FBDF3C950AACFB21506B21E6 /* InstallIdentity.swift in Sources */,
 				2005D8A5838921F183FD56BB /* LegDayDetailView.swift in Sources */,
+				20E6E9D5DF5FFD2F0BE3BF4E /* LocalRiveMascot.swift in Sources */,
 				91F21F549EF0ED897A3A4585 /* Mascot.swift in Sources */,
 				DCA1913090F7271B2AD78F7E /* MemoryChip.swift in Sources */,
 				7784E73CCA29405FA322657E /* MobileAppShell.swift in Sources */,
 				EF735AF0079324D3F4101BD7 /* MockData.swift in Sources */,
 				7CE62C8AF35FBE84C9F0FE01 /* OptionCard.swift in Sources */,
 				2376C0B3BA53D4FCE15F3F7B /* PageHeader.swift in Sources */,
+				D3E6710624573691F2E9A5A7 /* PlanCache.swift in Sources */,
 				EFDC024E5C799E29DBB7D1EF /* PlanCard.swift in Sources */,
 				DA6E8FBEE3B0F546BEB2C0CC /* PlanLibraryView.swift in Sources */,
+				37BE1763E5C6AA9B87964F97 /* PlanWire.swift in Sources */,
 				CB95C50874D8047E43088C68 /* PrimaryButton.swift in Sources */,
 				40DFC92944A4B8F7F38A9770 /* Profile.swift in Sources */,
+				725A1C0AC05F7207252CEB26 /* RealtimeAudioEngine.swift in Sources */,
+				75A96BEEBB2B76E4E16BE8B8 /* RealtimeCoachView.swift in Sources */,
+				1DF1DF20F3BFFF5EE4A1B0F8 /* RealtimeSession.swift in Sources */,
+				2EFF71FE9B18F7D2C7A1DEA3 /* RealtimeWire.swift in Sources */,
 				4ECF03F073485981F955A916 /* Records.swift in Sources */,
 				C525458FC887F311B87EC63A /* ReviewSummary.swift in Sources */,
 				E69A458744AAB90522803E6C /* ReviewView.swift in Sources */,
+				EE79989F6077699BC025ED5A /* RiveLabView.swift in Sources */,
 				ED333BC0DEF5B510E3D53110 /* RootView.swift in Sources */,
 				D770C7998D3AA95DD1B46318 /* SpeechRecognizer.swift in Sources */,
 				969EFCB37581CFCC247FF7BD /* StrengthCoachView.swift in Sources */,
@@ -423,7 +536,7 @@
 /* Begin XCBuildConfiguration section */
 		0A5C1E68088CAA6BC11794C2 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_A703722A-FC7B-4DC4-A910-19E43CDC9E99" /* Secrets.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGNING_ALLOWED = NO;
@@ -443,7 +556,7 @@
 		};
 		382A8157C0314B540CAE4CDD /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_A703722A-FC7B-4DC4-A910-19E43CDC9E99" /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -530,7 +643,7 @@
 		};
 		8DD3C532179EBF0A5669FBA8 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_A703722A-FC7B-4DC4-A910-19E43CDC9E99" /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -554,7 +667,7 @@
 		};
 		A1C0B32022452E30557BDAF4 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_A703722A-FC7B-4DC4-A910-19E43CDC9E99" /* Secrets.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGNING_ALLOWED = NO;
@@ -659,6 +772,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E926AA5FD7A1796F41BBC0BD /* XCRemoteSwiftPackageReference "rive-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/rive-app/rive-ios";
+			requirement = {
+				kind = exactVersion;
+				version = 6.20.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		45F14E53485F95B04B78F66C /* RiveRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E926AA5FD7A1796F41BBC0BD /* XCRemoteSwiftPackageReference "rive-ios" */;
+			productName = RiveRuntime;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 6EB026116FC1D17E43482AEB /* Project object */;
 }

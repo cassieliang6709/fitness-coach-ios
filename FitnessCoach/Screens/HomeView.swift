@@ -9,19 +9,34 @@ import SwiftUI
 /// switch so it reads as one place.
 struct HomeView: View {
     @Environment(WorkoutSession.self) private var session
+    @Environment(\.workoutStore) private var store
     @Binding var path: [Route]
 
-    @State private var tab = HomeTab.chat
+    @State private var tab = HomeTab.plan
 
     var body: some View {
         MobileAppShell {
             PageHeader(title: greeting, subtitle: subtitle) {
-                Mascot(pose: tab == .chat ? .listening : .idle, size: 42)
+                HStack(spacing: 8) {
+                    // Entry to the MiniMax realtime path. Separate from the
+                    // mic in the input bar below, which is on-device dictation
+                    // into the text coach — this one is a live voice call.
+                    IconButton(
+                        symbol: "waveform",
+                        tint: Theme.primary,
+                        background: Theme.lightOrange
+                    ) {
+                        path.append(.realtime)
+                    }
+                    .accessibilityLabel("实时语音陪练")
+
+                    Mascot(pose: tab == .chat ? .listening : .idle, size: 42)
+                }
             }
 
             switch tab {
             case .chat:
-                HomeChatTab(thread: session.daily)
+                HomeChatTab(thread: session.daily, path: $path)
             case .plan:
                 HomePlanTab(path: $path)
             }
@@ -31,9 +46,18 @@ struct HomeView: View {
                 case .chat:
                     HomeInputBar(thread: session.daily)
                 case .plan:
-                    PrimaryButton(title: "开始今天的训练") {
-                        session.enterStrength()
-                        path.append(.strength)
+                    if session.canStartWorkout {
+                        PrimaryButton(title: "开始今天的训练") {
+                            session.enterStrength()
+                            path.append(.strength)
+                        }
+                    } else {
+                        PrimaryButton(
+                            title: session.isPlanLoading ? "正在生成计划…" : "生成今天的计划",
+                            enabled: !session.isPlanLoading
+                        ) {
+                            Task { await session.syncPlan(generateIfMissing: true) }
+                        }
                     }
                 }
             }
@@ -52,8 +76,12 @@ struct HomeView: View {
         }
     }
 
+    /// On the plan tab this reads the welcome answers back to the user — without
+    /// it the goal and venue they picked never appear on the page that measures
+    /// them. Falls back to a description when there is no profile yet.
     private var subtitle: String {
-        tab == .chat ? "今天想练点什么？说一句就行。" : "今天的安排和你的记录"
+        guard tab == .plan else { return "今天想练点什么？说一句就行。" }
+        return store?.profile()?.summary ?? "今天的安排和你的记录"
     }
 }
 
@@ -86,18 +114,94 @@ private struct HomeBottomBar<Action: View>: View {
 /// The coach, before training. Same thread component as the coaching pages, so
 /// the conversation looks identical wherever it happens.
 private struct HomeChatTab: View {
+    @Environment(WorkoutSession.self) private var session
     @Bindable var thread: CoachThread
+    @Binding var path: [Route]
+
+    @Query(
+        filter: #Predicate<SessionRecord> { $0.endedAt != nil },
+        sort: \SessionRecord.startedAt,
+        order: .reverse
+    )
+    private var sessions: [SessionRecord]
+
+    private var visibleSuggestions: [String] {
+        thread.remainingSuggestions.filter { suggestion in
+            suggestion != "上次练得怎么样？"
+                || sessions.contains(where: { session.usesDemoData || !$0.isSamplePlan })
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            ChatThread(messages: thread.messages, isTyping: thread.isTyping)
-                .frame(maxHeight: .infinity)
-                .layoutPriority(1)
+            ChatThread(
+                messages: thread.messages,
+                isTyping: thread.isTyping,
+                generatedPlan: session.plan,
+                onOpenGeneratedPlan: { path.append(.legDay) }
+            )
+            .frame(maxHeight: .infinity)
+            .layoutPriority(1)
 
-            SuggestionRow(suggestions: thread.remainingSuggestions) { text in
+            SuggestionRow(suggestions: visibleSuggestions) { text in
                 thread.send(text: text)
             }
         }
+    }
+}
+
+/// The generated plan stays in the conversation where the user asked for it.
+/// It is intentionally compact: the detail screen owns the full exercise list.
+struct GeneratedPlanResultCard: View {
+    let plan: WorkoutPlan
+    let action: () -> Void
+
+    private var focusLabel: String {
+        let labels = plan.strengthExercises
+            .compactMap(\.libraryMuscleLabel)
+            .flatMap { label in
+                label.components(separatedBy: " · ")
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+            }
+        let unique = labels.reduce(into: [String]()) { result, label in
+            if !result.contains(label) { result.append(label) }
+        }
+        return unique.prefix(3).joined(separator: " · ")
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                PlanThumbnail(symbol: "sparkles", size: 52)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("AI 计划已生成")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.primary)
+                    Text(plan.title)
+                        .font(Theme.cardTitle)
+                        .foregroundStyle(Theme.mainText)
+                    Text(
+                        focusLabel.isEmpty
+                            ? "\(plan.strengthExercises.count) 个动作 · 来自动作库"
+                            : "\(plan.strengthExercises.count) 个动作 · 重点 \(focusLabel)"
+                    )
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                }
+
+                Spacer(minLength: 6)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.primary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .card(selected: true, filled: Theme.lightOrange.opacity(0.35), padding: 14)
+        .accessibilityLabel("查看 AI 计划：\(plan.title)")
     }
 }
 
@@ -221,7 +325,11 @@ private struct HomePlanTab: View {
     private var sessions: [SessionRecord]
 
     private var stats: TrainingStats {
-        TrainingStats(sessions: sessions, weeklyTarget: store?.weeklyTarget ?? 4)
+        TrainingStats(sessions: visibleSessions, weeklyTarget: store?.weeklyTarget ?? 4)
+    }
+
+    private var visibleSessions: [SessionRecord] {
+        session.usesDemoData ? sessions : sessions.filter { !$0.isSamplePlan }
     }
 
     var body: some View {
@@ -229,7 +337,11 @@ private struct HomePlanTab: View {
 
         return ScrollView {
             VStack(alignment: .leading, spacing: Theme.cardSpacing) {
-                todayCard
+                if session.canStartWorkout {
+                    todayCard
+                } else {
+                    planStatusCard
+                }
 
                 WeekStripe(stats: stats)
 
@@ -237,7 +349,7 @@ private struct HomePlanTab: View {
 
                 memorySection
 
-                if !sessions.isEmpty {
+                if !visibleSessions.isEmpty {
                     historySection
                 }
 
@@ -250,6 +362,37 @@ private struct HomePlanTab: View {
     }
 
     // MARK: Sections
+
+    private var planStatusCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                PlanThumbnail(
+                    symbol: session.isPlanLoading ? "sparkles" : "arrow.clockwise",
+                    size: 56
+                )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(session.isPlanLoading ? "正在生成今天的计划" : "还没有可用计划")
+                        .font(Theme.cardTitle)
+                        .foregroundStyle(Theme.mainText)
+                    Text(
+                        session.planError
+                            ?? "AI 会读取你的目标、场地和身体状况，动作只从真实动作库里选择。"
+                    )
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if !session.isPlanLoading {
+                GhostButton(title: "重新生成", symbol: "arrow.clockwise") {
+                    Task { await session.syncPlan(generateIfMissing: true) }
+                }
+            }
+        }
+        .card(selected: session.isPlanLoading)
+    }
 
     private var todayCard: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -325,7 +468,7 @@ private struct HomePlanTab: View {
             SectionTitle(title: "最近训练", detail: stats.weeklyHeadline)
 
             VStack(spacing: 8) {
-                ForEach(sessions.prefix(3)) { record in
+                ForEach(visibleSessions.prefix(3)) { record in
                     HistoryRow(record: record)
                 }
             }

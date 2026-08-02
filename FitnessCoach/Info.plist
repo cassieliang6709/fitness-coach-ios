@@ -24,10 +24,21 @@
 	<string>$(COACH_API_HOST)</string>
 	<key>COACH_SHARED_SECRET</key>
 	<string>$(COACH_SHARED_SECRET)</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>连接你电脑上运行的教练网关，用于实时语音陪练的联调。</string>
+	<key>NSCameraUsageDescription</key>
+	<string>拍摄健身房环境，让教练识别你实际能用的器械。</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>训练中用麦克风听你说话，把不适和反馈告诉教练。</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>把你说的话转成文字发给 AI 教练。识别在设备上完成。</string>
+	<key>REALTIME_GATEWAY_HOST</key>
+	<string>$(REALTIME_GATEWAY_HOST)</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

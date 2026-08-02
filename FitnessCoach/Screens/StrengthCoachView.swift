@@ -21,7 +21,7 @@ struct StrengthCoachView: View {
                 metrics: session.strengthMetrics,
                 progressLabel: session.setProgressLabel,
                 secondaryLabel: session.exerciseProgressLabel,
-                venue: MockData.strengthVenue,
+                venue: session.trainingVenue,
                 pose: session.isResting ? .drink : .dumbbell
             ) {
                 accessory

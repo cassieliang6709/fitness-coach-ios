@@ -1586,7 +1586,7 @@
    * you have actually finished. The header and the tab bar stay put across the
    * switch so it reads as one place. */
   function homeScreen() {
-    let tab = 'chat';
+    let tab = 'plan';
     const thread = session.daily;
 
     const greeting = (() => {
@@ -1605,7 +1605,7 @@
         <div class="tab-bar">
           ${['chat', 'plan']
             .map(
-              (id) => `<button class="tab ${id === 'chat' ? 'on' : ''}" data-tab="${id}">
+              (id) => `<button class="tab ${id === 'plan' ? 'on' : ''}" data-tab="${id}">
                 ${icon(id === 'chat' ? 'chat-bubbles' : 'checklist', 13)}
                 <span>${id === 'chat' ? '对话' : '我的计划'}</span>
               </button>`
@@ -1790,7 +1790,7 @@
     });
 
     renderHeader();
-    mountChat();
+    mountPlan();
 
     return {
       el: root,

@@ -123,6 +123,7 @@ struct CoachTurnRequest: Codable {
     let style: String
     let state: CoachContext
     let memories: [String]
+    let history: [String]
     let messages: [WireMessage]
 }
 
@@ -161,6 +162,11 @@ enum CoachEvent {
     case action(id: String, name: String, input: JSONValue, action: CoachAction?)
     /// Safety classifiers declined; no usable reply.
     case refusal(category: String?)
+    /// The coach composed a plan and the Worker accepted it into the catalogue.
+    case plan(PlanWire)
+    /// It composed one and validation rejected it — an unknown exercise id, or
+    /// implausible sets. Surfaced so the user sees why nothing changed.
+    case planError(reason: String)
     case done
 }
 

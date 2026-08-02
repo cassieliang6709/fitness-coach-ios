@@ -4,6 +4,7 @@ SwiftUI iOS app. One complete module of the product, not the whole app:
 
 ```
 /welcome → /home → /plans → /plans/leg-day
+                 → /exercises
                  → /workout/strength → /workout/cardio → /workout/review
 ```
 
@@ -19,7 +20,7 @@ the coach's first line already reflects them.
 | 我的计划 | Today's plan, this week's stripe, streak / totals, memory chips, recent sessions, tone picker |
 
 Both tabs share the header and the floating tab capsule, so switching reads as
-one place rather than two screens.
+one place rather than two screens. `我的计划` is the default tab.
 
 ## Run
 
@@ -91,35 +92,42 @@ scripted turn instead of opening a real recogniser.
 
 ## Backend (`worker/`)
 
-Cloudflare Worker that proxies Claude. Exists because the Anthropic key cannot
-ship inside the app binary. Data stays local (SwiftData) — the Worker is
-stateless and stores nothing.
+Cloudflare Worker that proxies the model providers. Keys never ship inside the
+app binary. Training records stay local in SwiftData; the exercise catalogue
+and generated plans live in D1 so the same active plan survives a relaunch.
 
 ```bash
 cd worker && npm install && npx wrangler deploy
 ```
 
-Two secrets, set with `wrangler secret put` (never in `wrangler.jsonc`, which is
-public): `ANTHROPIC_API_KEY` and `APP_SHARED_SECRET`.
+For a new D1 database, apply `schema.sql`, `seed-exercises.sql`, and
+`seed-names.sql` before deploying the Worker.
+
+Four secrets, set with `wrangler secret put` (never in `wrangler.jsonc`, which
+is public): `ANTHROPIC_API_KEY`, `MINIMAX_API_KEY`, `KIMI_API_KEY`, and
+`APP_SHARED_SECRET`.
 
 | Route | Auth | Purpose |
 | --- | --- | --- |
-| `GET /health` | Bearer | Reports whether the Claude key is configured (never its value) |
+| `GET /health` | Bearer | Reports whether the Claude and MiniMax keys are configured (never their values) |
 | `POST /coach/turn` | Bearer | Streams a coaching turn as SSE |
+| `GET /plan?user=…` | Bearer | Returns that install's active generated plan |
+| `POST /plan?user=…` | Bearer | Validates and stores a catalogue-backed plan |
+| `POST /speech` | Bearer | Voices the coach's final text with MiniMax T2A |
 
 `/coach/turn` request body: `{ style, state, memories, messages }`. It streams
 back `text` (token deltas), `action` (tool calls the app applies to local
-state), `refusal`, `done`, and `error` events.
+state), `plan` / `plan_error`, `refusal`, `done`, and `error` events.
 
-Three tools are exposed to the model — `adjust_weight`, `swap_exercise`, and
-`remember`. The app executes them; the Worker never touches app state.
+The app executes `adjust_weight`, `swap_exercise`, and `remember` locally.
+`generate_plan` runs on the Worker because both validation and the catalogue
+live there; accepted plans are cached by the app for offline launches.
 
 ## Mascot artwork
 
 `Mascot(pose:size:)` loads `mascot-<pose>` from `Resources/Assets.xcassets` and
-falls back to a shape-drawn stand-in when the image set is empty — which is the
-current state. To ship the real IP, drop the exported PNGs (or PDFs) into the
-matching image sets; no code changes needed:
+falls back to a shape-drawn stand-in when an image set is empty. The ten real
+PNG poses now live in the matching image sets and are used throughout the app:
 
 | Pose sheet | Image set | Used in |
 | --- | --- | --- |
@@ -135,6 +143,27 @@ matching image sets; no code changes needed:
 | 10 celebration | `mascot-celebration` | 复盘标题 |
 
 Unused poses are wired up and ready for the remaining ~15 screens.
+
+## Exercise library
+
+`/exercises` contains 50 structured movement definitions. Each entry includes
+its Chinese and English name, level, target muscles, equipment, default volume,
+three coaching cues, contraindicated body conditions and a mascot pose.
+
+Safety filtering runs before search and UI filtering. A saved knee, lower-back,
+shoulder or wrist condition therefore removes conflicting movements from the
+available source rather than merely hiding a warning on their cards. Venue
+support is applied in the same pass, so home and outdoor users do not see
+gym-only machines.
+
+These rules are conservative product guardrails, not a diagnosis or a clinical
+exercise prescription. The full movement-to-condition matrix should be
+reviewed by a qualified trainer or physical therapist before release.
+
+Each exercise also reserves an `exercise-<id>` animation asset name. Until a
+biomechanically reviewed Lottie or Rive animation exists, the app shows the
+honest still mascot fallback instead of treating decorative motion as form
+instruction.
 
 ## Structure
 

@@ -11,6 +11,7 @@ struct WelcomeView: View {
 
     @State private var step = 0
     @State private var draft = UserProfile()
+    @State private var gymVision = GymVision(userID: InstallIdentity.current)
 
     private static let lastStep = 4
 
@@ -42,7 +43,11 @@ struct WelcomeView: View {
             }
         } bottom: {
             BottomBar {
-                PrimaryButton(title: step == Self.lastStep ? "开始使用" : "继续", action: advance)
+                PrimaryButton(
+                    title: step == Self.lastStep ? "开始使用" : "继续",
+                    enabled: !isBusy,
+                    action: advance
+                )
             }
         }
         .animation(.easeInOut(duration: 0.25), value: step)
@@ -123,6 +128,7 @@ struct WelcomeView: View {
         }
     }
 
+    @ViewBuilder
     private var venueStep: some View {
         ForEach(TrainingVenue.allCases) { venue in
             OptionCard(
@@ -132,6 +138,17 @@ struct WelcomeView: View {
                 selected: draft.venue == venue
             ) {
                 draft.venue = venue
+            }
+        }
+
+        if draft.venue == .gym {
+            if let gymVision {
+                GymPhotoScanner(vision: gymVision, goal: draft.goal.label)
+            } else {
+                Label("配置教练服务后可识别健身房器械", systemImage: "camera.viewfinder")
+                    .font(Theme.body)
+                    .foregroundStyle(Theme.secondaryText)
+                    .card(filled: Theme.surface)
             }
         }
     }
@@ -196,7 +213,22 @@ struct WelcomeView: View {
             onFinish(draft)
             return
         }
+
+        if step == 2, draft.venue == .gym, let gymVision, gymVision.needsSave {
+            Task {
+                let equipment = gymVision.confirmedEquipment
+                guard await gymVision.saveConfirmed() else { return }
+                draft.equipment = equipment
+                step += 1
+            }
+            return
+        }
         step += 1
+    }
+
+    private var isBusy: Bool {
+        guard step == 2, let gymVision else { return false }
+        return gymVision.phase == .uploading || gymVision.phase == .saving
     }
 }
 

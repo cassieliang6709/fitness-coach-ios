@@ -5,6 +5,20 @@ import SwiftUI
 struct ChatThread: View {
     let messages: [ChatMessage]
     let isTyping: Bool
+    var generatedPlan: WorkoutPlan?
+    var onOpenGeneratedPlan: (() -> Void)?
+
+    init(
+        messages: [ChatMessage],
+        isTyping: Bool,
+        generatedPlan: WorkoutPlan? = nil,
+        onOpenGeneratedPlan: (() -> Void)? = nil
+    ) {
+        self.messages = messages
+        self.isTyping = isTyping
+        self.generatedPlan = generatedPlan
+        self.onOpenGeneratedPlan = onOpenGeneratedPlan
+    }
 
     private let bottomAnchor = "chat-bottom"
 
@@ -13,14 +27,26 @@ struct ChatThread: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     ForEach(messages) { message in
-                        ChatBubble(message: message)
-                            .id(message.id)
-                            .transition(
-                                .asymmetric(
-                                    insertion: .opacity.combined(with: .offset(y: 6)),
-                                    removal: .opacity
+                        Group {
+                            if message.kind == .generatedPlan,
+                                let generatedPlan,
+                                let onOpenGeneratedPlan
+                            {
+                                GeneratedPlanResultCard(
+                                    plan: generatedPlan,
+                                    action: onOpenGeneratedPlan
                                 )
+                            } else if message.kind == .text {
+                                ChatBubble(message: message)
+                            }
+                        }
+                        .id(message.id)
+                        .transition(
+                            .asymmetric(
+                                insertion: .opacity.combined(with: .offset(y: 6)),
+                                removal: .opacity
                             )
+                        )
                     }
 
                     if isTyping {

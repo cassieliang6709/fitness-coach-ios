@@ -6,3 +6,9 @@ xcuserdata/
 *.xcworkspace/xcuserdata/
 .swiftpm/
 Secrets.xcconfig
+
+# Coach Gateway handoff: keep the write-ups, leave the implementation out.
+# worker/ is the one backend, so the Node server, its scripts, its runtime
+# state and its vendor keys all stay untracked.
+Vance_Coach_Gateway_Handoff_20260802/*
+!Vance_Coach_Gateway_Handoff_20260802/*.md

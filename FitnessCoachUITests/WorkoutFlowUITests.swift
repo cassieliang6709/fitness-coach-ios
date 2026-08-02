@@ -29,7 +29,7 @@ final class WorkoutFlowUITests: XCTestCase {
         return app
     }
 
-    /// Home opens on 对话; the plan tab is one tap away.
+    /// Keep callers explicit about the plan tab, even though it is the default.
     private func openPlanTab(_ app: XCUIApplication) {
         let planTab = app.buttons["我的计划"]
         XCTAssertTrue(planTab.waitForExistence(timeout: 5))
@@ -38,6 +38,57 @@ final class WorkoutFlowUITests: XCTestCase {
 
     /// 4 + 4 + 3 + 3 + 3 + 3
     private static let plannedSets = 20
+
+    // MARK: - Exercise library
+
+    func testRiveLabSwitchesTheCharacterStateMachineInput() {
+        let app = launch(route: "/rive-lab")
+
+        XCTAssertTrue(app.staticTexts["Rive 动作实验"].waitForExistence(timeout: 6))
+        XCTAssertTrue(app.staticTexts["当前状态：Beginner"].exists)
+
+        app.buttons["rive-level-expert"].tap()
+        XCTAssertTrue(app.staticTexts["当前状态：Expert"].waitForExistence(timeout: 3))
+    }
+
+    func testExerciseLibraryFiltersKneeContraindicationsBeforeSearch() {
+        let app = launch(route: "/exercises")
+
+        XCTAssertTrue(app.staticTexts["动作库"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["34 个适合你 · 完整库 50 个"].exists)
+        XCTAssertTrue(app.staticTexts["猫牛式"].exists)
+
+        // The demo profile has a knee condition. Searching cannot bring a
+        // contraindicated movement back after the safety filter has run.
+        let search = app.textFields["搜索动作、部位或器械"]
+        XCTAssertTrue(search.exists)
+        search.tap()
+        search.typeText("高脚杯深蹲")
+        XCTAssertTrue(app.staticTexts["没有匹配的动作"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["高脚杯深蹲"].exists)
+    }
+
+    func testExerciseLibraryUsesExerciseSpecificArtwork() {
+        let app = launch(route: "/exercises")
+
+        let search = app.textFields["搜索动作、部位或器械"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+        search.typeText("臀桥")
+
+        XCTAssertTrue(app.staticTexts["臀桥"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.images["exercise-specific-artwork-glute-bridge"].exists)
+
+        if app.keyboards.firstMatch.exists {
+            app.keyboards.firstMatch.swipeDown()
+        }
+        app.swipeUp()
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "exercise-library-glute-bridge-artwork"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
 
     // MARK: - Welcome
 
@@ -54,6 +105,7 @@ final class WorkoutFlowUITests: XCTestCase {
         app.buttons["继续"].tap()
 
         XCTAssertTrue(app.staticTexts["平时在哪训练？"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["拍下你常用的器械"].exists)
         app.buttons["option-家里"].tap()
         app.buttons["继续"].tap()
 
@@ -65,7 +117,7 @@ final class WorkoutFlowUITests: XCTestCase {
         app.buttons["温和"].tap()
         app.buttons["开始使用"].tap()
 
-        // Home, chat tab: the coach opens the conversation itself.
+        // Home opens on the plan tab, where the onboarding answers are visible.
         openPlanTab(app)
         XCTAssertTrue(app.staticTexts["训练目标：增肌"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["常在家里训练"].exists)
@@ -90,11 +142,20 @@ final class WorkoutFlowUITests: XCTestCase {
     func testHomeTabsSwitchContent() {
         let app = launch()
 
+        // 我的计划 is the default home tab.
+        XCTAssertTrue(app.staticTexts["本周训练"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["AI 记住的事"].exists)
+        XCTAssertTrue(app.buttons["开始今天的训练"].exists)
+
         // 对话: the coach's opening line, and tappable openers.
+        app.buttons["对话"].tap()
         XCTAssertTrue(
             app.staticTexts["今天安排的是练腿日：力量 60 分钟，有氧 20–30 分钟。"]
                 .waitForExistence(timeout: 8)
         )
+        // A cached/default plan is not a chat result. The card only appears
+        // after this conversation actually generates a new plan.
+        XCTAssertFalse(app.staticTexts["AI 计划已生成"].exists)
 
         // A chip answers the question it names, not the next line in the script.
         app.buttons["今天时间不多"].waitAndTap()
@@ -131,6 +192,21 @@ final class WorkoutFlowUITests: XCTestCase {
 
         app.buttons["开始陪练"].tap()
         XCTAssertTrue(app.staticTexts["力量陪练"].waitForExistence(timeout: 3))
+    }
+
+    func testPlanExerciseOpensLibraryDetailAndReturnsToPlan() {
+        let app = launch(route: "/plans/leg-day")
+
+        XCTAssertTrue(app.staticTexts["已连接你的动作库"].waitForExistence(timeout: 5))
+        app.buttons["plan-exercise-goblet-squat"].waitAndTap()
+
+        XCTAssertTrue(app.staticTexts["高脚杯深蹲"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["大腿前侧 · 臀"].exists)
+        XCTAssertTrue(app.staticTexts["在今天的 AI 计划里"].exists)
+
+        app.buttons["返回"].waitAndTap()
+        XCTAssertTrue(app.staticTexts["练腿日计划"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["已连接你的动作库"].exists)
     }
 
     // MARK: - Voice UI states and the knee adjustment
@@ -296,7 +372,7 @@ final class WorkoutFlowUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 3))
         field.tap()
         field.typeText("开始")
-        app.keyboards.buttons["send"].firstMatch.tap()
+        app.buttons["workout-send-button"].waitAndTap()
 
         XCTAssertTrue(
             app.staticTexts["膝盖朝脚尖方向，髋部向后坐。"].waitForExistence(timeout: 8)
