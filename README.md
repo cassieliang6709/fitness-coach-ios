@@ -20,7 +20,7 @@ the coach's first line already reflects them.
 | 我的计划 | Today's plan, this week's stripe, streak / totals, memory chips, recent sessions, tone picker |
 
 Both tabs share the header and the floating tab capsule, so switching reads as
-one place rather than two screens.
+one place rather than two screens. `我的计划` is the default tab.
 
 ## Run
 

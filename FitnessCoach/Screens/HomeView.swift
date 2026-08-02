@@ -12,7 +12,7 @@ struct HomeView: View {
     @Environment(\.workoutStore) private var store
     @Binding var path: [Route]
 
-    @State private var tab = HomeTab.chat
+    @State private var tab = HomeTab.plan
 
     var body: some View {
         MobileAppShell {

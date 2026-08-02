@@ -29,7 +29,7 @@ final class WorkoutFlowUITests: XCTestCase {
         return app
     }
 
-    /// Home opens on 对话; the plan tab is one tap away.
+    /// Keep callers explicit about the plan tab, even though it is the default.
     private func openPlanTab(_ app: XCUIApplication) {
         let planTab = app.buttons["我的计划"]
         XCTAssertTrue(planTab.waitForExistence(timeout: 5))
@@ -112,7 +112,7 @@ final class WorkoutFlowUITests: XCTestCase {
         app.buttons["温和"].tap()
         app.buttons["开始使用"].tap()
 
-        // Home, chat tab: the coach opens the conversation itself.
+        // Home opens on the plan tab, where the onboarding answers are visible.
         openPlanTab(app)
         XCTAssertTrue(app.staticTexts["训练目标：增肌"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["常在家里训练"].exists)
@@ -137,7 +137,13 @@ final class WorkoutFlowUITests: XCTestCase {
     func testHomeTabsSwitchContent() {
         let app = launch()
 
+        // 我的计划 is the default home tab.
+        XCTAssertTrue(app.staticTexts["本周训练"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["AI 记住的事"].exists)
+        XCTAssertTrue(app.buttons["开始今天的训练"].exists)
+
         // 对话: the coach's opening line, and tappable openers.
+        app.buttons["对话"].tap()
         XCTAssertTrue(
             app.staticTexts["今天安排的是练腿日：力量 60 分钟，有氧 20–30 分钟。"]
                 .waitForExistence(timeout: 8)
