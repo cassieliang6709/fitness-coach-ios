@@ -19,6 +19,7 @@ final class WorkoutStore {
         MemoryRecord.self,
         EquipmentRecord.self,
         GymLocationRecord.self,
+        GymVisionTimingRecord.self,
         ProfileRecord.self,
         SessionRecord.self,
         SetLogRecord.self,
@@ -156,6 +157,11 @@ final class WorkoutStore {
         save()
     }
 
+    func recordGymVisionTiming(_ timing: GymVisionTiming) {
+        context.insert(GymVisionTimingRecord(timing: timing))
+        save()
+    }
+
     /// Saves the factual photo observation and its user-authorized location.
     /// The paired memory chips are just a compact, editable projection of
     /// these tables for the planning UI and the coach prompt.
@@ -185,20 +191,19 @@ final class WorkoutStore {
                     locationID: locationID
                 ))
             }
-            upsertMemory(
-                id: "memory-\(id)",
-                category: .equipment,
-                text: "已确认可用器械：\(item.name)",
-                sourceSessionID: nil
-            )
+            // Older builds stored one memory for every device. Once this
+            // observation is merged below, hide those legacy fragments.
+            deactivateMemory(id: "memory-\(id)")
         }
-        if let location {
+        if let location, let locationID, let placeName = location.displayName {
+            let equipmentNames = equipmentAtLocation(locationID)
             upsertMemory(
-                id: "memory-venue-\(locationID ?? "latest")",
-                category: .venue,
-                text: location.memoryText,
+                id: "memory-gym-\(locationID)",
+                category: .equipment,
+                text: "\(placeName) · \(equipmentNames.joined(separator: "、"))",
                 sourceSessionID: nil
             )
+            deactivateMemory(id: "memory-venue-\(locationID)")
         }
         save()
     }
@@ -261,6 +266,7 @@ final class WorkoutStore {
     func wipe() {
         try? context.delete(model: EquipmentRecord.self)
         try? context.delete(model: GymLocationRecord.self)
+        try? context.delete(model: GymVisionTimingRecord.self)
         try? context.delete(model: SetLogRecord.self)
         try? context.delete(model: SessionRecord.self)
         try? context.delete(model: MemoryRecord.self)
@@ -282,12 +288,22 @@ final class WorkoutStore {
         let descriptor = FetchDescriptor<GymLocationRecord>(predicate: #Predicate { $0.id == id })
         if let existing = try? context.fetch(descriptor).first {
             existing.horizontalAccuracy = snapshot.horizontalAccuracy
+            if let placeName = snapshot.displayName { existing.placeName = placeName }
             existing.lastObservedAt = snapshot.capturedAt
             existing.observationCount += 1
         } else {
             context.insert(GymLocationRecord(id: id, snapshot: snapshot))
         }
         return id
+    }
+
+    private func equipmentAtLocation(_ locationID: String) -> [String] {
+        let records = (try? context.fetch(FetchDescriptor<EquipmentRecord>())) ?? []
+        var seen = Set<String>()
+        return records
+            .filter { $0.lastLocationID == locationID }
+            .map(\.name)
+            .filter { seen.insert($0).inserted }
     }
 
     private func ensureGymLocation(_ snapshot: GymLocationSnapshot) -> String {

@@ -48,8 +48,13 @@ enum VanceGatewayError: LocalizedError {
     }
 }
 
-struct GymVisionResult: Codable, Hashable {
-    struct Equipment: Codable, Hashable {
+struct GymVisionGatewayTiming: Codable, Hashable, Sendable {
+    let gatewayElapsedMilliseconds: Int
+    let kimiElapsedMilliseconds: Int
+}
+
+struct GymVisionResult: Codable, Hashable, Sendable {
+    struct Equipment: Codable, Hashable, Sendable {
         let name: String
         let confidence: String
         let visibleEvidence: String
@@ -58,6 +63,12 @@ struct GymVisionResult: Codable, Hashable {
     let sceneSummary: String
     let equipment: [Equipment]
     let needsConfirmation: [String]
+    let timing: GymVisionGatewayTiming?
+}
+
+struct GymVisionRecognition: Sendable {
+    let result: GymVisionResult
+    let clientRequestElapsedMilliseconds: Int
 }
 
 /// A server-sanitized durable memory addition or update.
@@ -85,10 +96,11 @@ struct GymVisionAPI: Sendable {
         conversationID: String,
         goal: String,
         userPlan: String
-    ) async throws -> GymVisionResult {
+    ) async throws -> GymVisionRecognition {
         guard let url = config.httpURL(path: "/api/gym-vision") else {
             throw VanceGatewayError.notConfigured
         }
+        let requestStartedAt = Date()
         let encoded = imageData.base64EncodedString()
         let requestBody = GymVisionRequest(
             conversationId: conversationID,
@@ -109,7 +121,11 @@ struct GymVisionAPI: Sendable {
             let error = try? JSONDecoder().decode(GatewayErrorPayload.self, from: data)
             throw VanceGatewayError.upstream(error?.error ?? "识别服务不可用（HTTP \(http.statusCode)）")
         }
-        return try JSONDecoder().decode(GymVisionResult.self, from: data)
+        let result = try JSONDecoder().decode(GymVisionResult.self, from: data)
+        return GymVisionRecognition(
+            result: result,
+            clientRequestElapsedMilliseconds: Int(Date().timeIntervalSince(requestStartedAt) * 1_000)
+        )
     }
 
     private struct GymVisionRequest: Encodable {

@@ -38,6 +38,8 @@ final class CoachThread {
     /// Persists the user-authorized location even if Kimi cannot recognize the
     /// image or the network request fails.
     var gymLocationHandler: (@MainActor (GymLocationSnapshot) -> Void)?
+    /// Stores local, stage-level timings for each equipment-recognition turn.
+    var gymVisionTimingHandler: (@MainActor (GymVisionTiming) -> Void)?
     /// Executes a coach action against session state and returns the tool
     /// result string the model sees next turn.
     var actionHandler: (@MainActor (CoachAction) -> String)?
@@ -289,32 +291,26 @@ final class CoachThread {
     func recognizeGymEquipment(
         imageData: Data,
         mimeType: String,
-        location: GymLocationSnapshot?
+        locationTask: Task<GymLocationLookup, Never>,
+        captureTiming: GymVisionCaptureTiming
     ) async {
         guard !isVisionRecognizing, let vision, let context = currentContext() else { return }
         isVisionRecognizing = true
-        let photoMessage = ChatMessage(role: .user, content: "📷 已上传健身房照片，正在识别器械…")
+        let photoMessage = ChatMessage(role: .user, content: "📷 已上传健身房照片，正在识别器械与定位…")
         append(photoMessage)
-        if let location { gymLocationHandler?(location) }
 
         defer { isVisionRecognizing = false }
         do {
-            let result = try await vision.recognize(
+            let recognition = try await vision.recognize(
                 imageData: imageData,
                 mimeType: mimeType,
                 conversationID: UUID().uuidString,
                 goal: "减脂与基础体能",
                 userPlan: "阶段：\(context.phase)；当前计划：\(context.exercise)；安排：\(context.prescription)"
             )
+            let result = recognition.result
             update(id: photoMessage.id, content: "📷 已上传健身房照片")
             recognizedEquipment = result.equipment.map(\.name)
-            gymObservationHandler?(result, location)
-            scheduleMemorySummary(
-                transcript: [
-                    "用户上传了健身房照片。",
-                    "已确认器械：\(recognizedEquipment.joined(separator: "、"))。",
-                ]
-            )
 
             let reply: String
             if recognizedEquipment.isEmpty {
@@ -323,11 +319,48 @@ final class CoachThread {
                 reply = "已确认设备：\(recognizedEquipment.joined(separator: "、"))。接下来直接和我说话，我会结合它们继续。"
             }
             append(.init(role: .assistant, content: reply))
+            let locationLookup = await locationTask.value
+            let location = locationLookup.snapshot
+            if let location { gymLocationHandler?(location) }
+            gymObservationHandler?(result, location)
+            appendLocationMessage(for: location)
+            let timing = GymVisionTiming(
+                capturedAt: captureTiming.startedAt,
+                imageBytes: captureTiming.imageBytes,
+                jpegElapsedMilliseconds: captureTiming.jpegElapsedMilliseconds,
+                clientRequestElapsedMilliseconds: recognition.clientRequestElapsedMilliseconds,
+                gatewayElapsedMilliseconds: result.timing?.gatewayElapsedMilliseconds,
+                kimiElapsedMilliseconds: result.timing?.kimiElapsedMilliseconds,
+                locationElapsedMilliseconds: locationLookup.elapsedMilliseconds,
+                succeeded: true
+            )
+            gymVisionTimingHandler?(timing)
         } catch {
             update(id: photoMessage.id, content: "📷 器械照片未识别")
             let message = (error as? LocalizedError)?.errorDescription ?? "器械识别暂不可用"
             append(.init(role: .assistant, content: message))
+            let failedRequestElapsedMilliseconds = Int(Date().timeIntervalSince(captureTiming.startedAt) * 1_000) - captureTiming.jpegElapsedMilliseconds
+            let locationLookup = await locationTask.value
+            let location = locationLookup.snapshot
+            if let location { gymLocationHandler?(location) }
+            appendLocationMessage(for: location)
+            let timing = GymVisionTiming(
+                capturedAt: captureTiming.startedAt,
+                imageBytes: captureTiming.imageBytes,
+                jpegElapsedMilliseconds: captureTiming.jpegElapsedMilliseconds,
+                clientRequestElapsedMilliseconds: failedRequestElapsedMilliseconds,
+                gatewayElapsedMilliseconds: nil,
+                kimiElapsedMilliseconds: nil,
+                locationElapsedMilliseconds: locationLookup.elapsedMilliseconds,
+                succeeded: false
+            )
+            gymVisionTimingHandler?(timing)
         }
+    }
+
+    private func appendLocationMessage(for location: GymLocationSnapshot?) {
+        let name = location?.displayName ?? "未能获取明确地点"
+        append(.init(role: .assistant, content: "地点：\(name)"))
     }
 
     private func currentContext() -> CoachContext? {

@@ -81,6 +81,7 @@ final class GymLocationRecord {
     var latitude: Double
     var longitude: Double
     var horizontalAccuracy: Double
+    var placeName: String?
     var firstObservedAt: Date
     var lastObservedAt: Date
     var observationCount: Int
@@ -90,9 +91,37 @@ final class GymLocationRecord {
         self.latitude = snapshot.latitude
         self.longitude = snapshot.longitude
         self.horizontalAccuracy = snapshot.horizontalAccuracy
+        self.placeName = snapshot.displayName
         self.firstObservedAt = snapshot.capturedAt
         self.lastObservedAt = snapshot.capturedAt
         self.observationCount = 1
+    }
+}
+
+/// Local-only performance facts for a photo-recognition attempt. They are
+/// deliberately not mixed into the user's coaching memories or sent upstream.
+@Model
+final class GymVisionTimingRecord {
+    @Attribute(.unique) var id: String
+    var capturedAt: Date
+    var imageBytes: Int
+    var jpegElapsedMilliseconds: Int
+    var clientRequestElapsedMilliseconds: Int
+    var gatewayElapsedMilliseconds: Int?
+    var kimiElapsedMilliseconds: Int?
+    var locationElapsedMilliseconds: Int
+    var succeeded: Bool
+
+    init(id: String = UUID().uuidString, timing: GymVisionTiming) {
+        self.id = id
+        self.capturedAt = timing.capturedAt
+        self.imageBytes = timing.imageBytes
+        self.jpegElapsedMilliseconds = timing.jpegElapsedMilliseconds
+        self.clientRequestElapsedMilliseconds = timing.clientRequestElapsedMilliseconds
+        self.gatewayElapsedMilliseconds = timing.gatewayElapsedMilliseconds
+        self.kimiElapsedMilliseconds = timing.kimiElapsedMilliseconds
+        self.locationElapsedMilliseconds = timing.locationElapsedMilliseconds
+        self.succeeded = timing.succeeded
     }
 }
 

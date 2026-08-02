@@ -208,6 +208,9 @@ final class WorkoutSession {
         thread.gymLocationHandler = { [weak self] location in
             self?.store.recordGymLocation(location)
         }
+        thread.gymVisionTimingHandler = { [weak self] timing in
+            self?.store.recordGymVisionTiming(timing)
+        }
         thread.contextProvider = { [weak self] in
             self?.coachContext(phase: phase)
                 ?? CoachContext(phase: phase, exercise: "-", prescription: "-")

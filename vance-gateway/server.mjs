@@ -65,16 +65,23 @@ async function handleRequest(request, response) {
     });
   }
   if (url.pathname === '/api/gym-vision' && request.method === 'POST') {
+    const gatewayStartedAt = performance.now();
     if (!authorized(request)) return sendJson(response, 401, { error: 'unauthorized' });
     if (!kimiKey) return sendJson(response, 503, { error: 'KIMI_API_KEY 未配置' });
     const input = validateGymVisionInput(await readJson(request, 12 * 1024 * 1024));
+    const kimiStartedAt = performance.now();
     const upstream = await fetch('https://api.moonshot.cn/v1/chat/completions', {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${kimiKey}` },
       body: JSON.stringify(createKimiGymVisionRequest({ ...input })),
     });
+    const kimiElapsedMilliseconds = Math.round(performance.now() - kimiStartedAt);
     if (!upstream.ok) throw new Error(`Kimi 识别暂时不可用（HTTP ${upstream.status}）`);
     const result = parseGymVisionResponse((await upstream.json()).choices?.[0]?.message?.content);
+    result.timing = {
+      gatewayElapsedMilliseconds: Math.round(performance.now() - gatewayStartedAt),
+      kimiElapsedMilliseconds,
+    };
     return sendJson(response, 200, result);
   }
   if (url.pathname === '/api/memory-summary' && request.method === 'POST') {

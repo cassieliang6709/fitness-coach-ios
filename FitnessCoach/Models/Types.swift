@@ -112,7 +112,7 @@ enum MemoryCategory: String, CaseIterable, Hashable, Codable, Sendable {
         case .injury: return "figure.walk.motion"
         case .preference: return "slider.horizontal.3"
         case .venue: return "mappin.and.ellipse"
-        case .equipment: return "dumbbell"
+        case .equipment: return "checkmark.square.fill"
         }
     }
 
@@ -133,20 +133,44 @@ struct WorkoutMemory: Identifiable, Hashable {
     var active: Bool = true
 }
 
-/// A coordinate captured only after the user has granted foreground location
-/// access. It intentionally contains no reverse-geocoded address so the app
-/// stores the minimum location data needed to recognize a familiar gym.
+/// A foreground location captured after user authorization. `placeName` is a
+/// compact reverse-geocoded label for the current gym, never a coordinate.
 struct GymLocationSnapshot: Sendable, Hashable {
     let latitude: Double
     let longitude: Double
     let horizontalAccuracy: Double
+    let placeName: String?
     let capturedAt: Date
 
-    var memoryText: String {
-        // Coordinates remain in GymLocationRecord only. Memories are sent to
-        // the coach, so their display text must never disclose a precise place.
-        "训练地点：已在设备上记录"
+    var displayName: String? {
+        placeName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
+struct GymLocationLookup: Sendable, Hashable {
+    let snapshot: GymLocationSnapshot?
+    let elapsedMilliseconds: Int
+}
+
+struct GymVisionCaptureTiming: Sendable, Hashable {
+    let startedAt: Date
+    let jpegElapsedMilliseconds: Int
+    let imageBytes: Int
+}
+
+struct GymVisionTiming: Sendable, Hashable {
+    let capturedAt: Date
+    let imageBytes: Int
+    let jpegElapsedMilliseconds: Int
+    let clientRequestElapsedMilliseconds: Int
+    let gatewayElapsedMilliseconds: Int?
+    let kimiElapsedMilliseconds: Int?
+    let locationElapsedMilliseconds: Int
+    let succeeded: Bool
 }
 
 // MARK: - Chat

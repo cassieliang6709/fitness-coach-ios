@@ -1,6 +1,6 @@
 import SwiftData
 import SwiftUI
-import CoreLocation
+@preconcurrency import CoreLocation
 import UIKit
 
 /// /home — the app's root after onboarding.
@@ -236,15 +236,29 @@ private struct HomeInputBar: View {
 
     private func capture(_ image: UIImage) {
         Task {
+            let captureStartedAt = Date()
             guard let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
-            // iOS presents the foreground-location prompt only after the
-            // user has deliberately taken a photo. A denial is allowed:
-            // the equipment still saves, simply without a place record.
-            let location = await GymLocationService.shared.currentLocation()
+            let captureTiming = GymVisionCaptureTiming(
+                startedAt: captureStartedAt,
+                jpegElapsedMilliseconds: Int(Date().timeIntervalSince(captureStartedAt) * 1_000),
+                imageBytes: jpeg.count
+            )
+            // Start the foreground location request at the same time as the
+            // Kimi upload. The image path never needs location data, so it
+            // must not wait for GPS or reverse geocoding before it starts.
+            let locationTask = Task {
+                let startedAt = Date()
+                let snapshot = await GymLocationService.shared.currentLocation()
+                return GymLocationLookup(
+                    snapshot: snapshot,
+                    elapsedMilliseconds: Int(Date().timeIntervalSince(startedAt) * 1_000)
+                )
+            }
             await thread.recognizeGymEquipment(
                 imageData: jpeg,
                 mimeType: "image/jpeg",
-                location: location
+                locationTask: locationTask,
+                captureTiming: captureTiming
             )
         }
     }
@@ -313,7 +327,7 @@ private struct GymCameraPicker: UIViewControllerRepresentable {
 }
 
 @MainActor
-private final class GymLocationService: NSObject, CLLocationManagerDelegate {
+private final class GymLocationService: NSObject {
     static let shared = GymLocationService()
 
     private let manager = CLLocationManager()
@@ -347,10 +361,37 @@ private final class GymLocationService: NSObject, CLLocationManagerDelegate {
     }
 
     private func requestLocation() async -> GymLocationSnapshot? {
-        await withCheckedContinuation { continuation in
+        guard let snapshot = await withCheckedContinuation({ continuation in
             locationContinuation = continuation
             manager.requestLocation()
+        }) else { return nil }
+        return await addingPlaceName(to: snapshot)
+    }
+
+    private func addingPlaceName(to snapshot: GymLocationSnapshot) async -> GymLocationSnapshot {
+        let location = CLLocation(latitude: snapshot.latitude, longitude: snapshot.longitude)
+        let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location)
+        let placemark = placemarks?.first
+        let name = placemark.flatMap { placemark in
+            let locality = [placemark.subLocality, placemark.locality]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: " · ")
+            let candidates: [String?] = [
+                placemark.areasOfInterest?.first,
+                placemark.name,
+                locality.isEmpty ? nil : locality,
+            ]
+            return candidates.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .first { !$0.isEmpty }
         }
+        return GymLocationSnapshot(
+            latitude: snapshot.latitude,
+            longitude: snapshot.longitude,
+            horizontalAccuracy: snapshot.horizontalAccuracy,
+            placeName: name,
+            capturedAt: snapshot.capturedAt
+        )
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -371,6 +412,7 @@ private final class GymLocationService: NSObject, CLLocationManagerDelegate {
             latitude: location.coordinate.latitude,
             longitude: location.coordinate.longitude,
             horizontalAccuracy: location.horizontalAccuracy,
+            placeName: nil,
             capturedAt: .now
         ))
     }
@@ -380,6 +422,8 @@ private final class GymLocationService: NSObject, CLLocationManagerDelegate {
         locationContinuation = nil
     }
 }
+
+extension GymLocationService: @preconcurrency CLLocationManagerDelegate {}
 
 // MARK: - Plan tab
 
@@ -492,7 +536,9 @@ private struct HomePlanTab: View {
     }
 
     private var memorySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let equipmentMemories = memories.filter { $0.category == .equipment }
+        let otherMemories = memories.filter { $0.category != .equipment }
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 SectionTitle(title: "AI 记住的事", detail: "\(memories.count) 条")
                 Spacer()
@@ -507,7 +553,16 @@ private struct HomePlanTab: View {
                     .font(Theme.caption)
                     .foregroundStyle(Theme.secondaryText)
             } else {
-                MemoryChipRow(memories: memories.map(\.asMemory))
+                if !equipmentMemories.isEmpty {
+                    VStack(spacing: 8) {
+                        ForEach(equipmentMemories) { memory in
+                            EquipmentLocationMemoryRow(memory: memory.asMemory)
+                        }
+                    }
+                }
+                if !otherMemories.isEmpty {
+                    MemoryChipRow(memories: otherMemories.map(\.asMemory))
+                }
             }
         }
         .sheet(isPresented: $isShowingMemoryLibrary) {
@@ -525,6 +580,30 @@ private struct HomePlanTab: View {
                 }
             }
         }
+    }
+}
+
+/// A whole location and its confirmed equipment live in one editable memory,
+/// so the list never fragments a single gym into multiple device chips.
+private struct EquipmentLocationMemoryRow: View {
+    let memory: WorkoutMemory
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "checkmark.square.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.primary)
+                .frame(width: 20, alignment: .leading)
+            Text(memory.text)
+                .font(Theme.body)
+                .foregroundStyle(Theme.mainText)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.surface))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.border, lineWidth: 1))
     }
 }
 
