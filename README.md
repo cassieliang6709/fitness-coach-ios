@@ -4,6 +4,7 @@ SwiftUI iOS app. One complete module of the product, not the whole app:
 
 ```
 /welcome → /home → /plans → /plans/leg-day
+                 → /exercises
                  → /workout/strength → /workout/cardio → /workout/review
 ```
 
@@ -117,9 +118,8 @@ Three tools are exposed to the model — `adjust_weight`, `swap_exercise`, and
 ## Mascot artwork
 
 `Mascot(pose:size:)` loads `mascot-<pose>` from `Resources/Assets.xcassets` and
-falls back to a shape-drawn stand-in when the image set is empty — which is the
-current state. To ship the real IP, drop the exported PNGs (or PDFs) into the
-matching image sets; no code changes needed:
+falls back to a shape-drawn stand-in when an image set is empty. The ten real
+PNG poses now live in the matching image sets and are used throughout the app:
 
 | Pose sheet | Image set | Used in |
 | --- | --- | --- |
@@ -135,6 +135,27 @@ matching image sets; no code changes needed:
 | 10 celebration | `mascot-celebration` | 复盘标题 |
 
 Unused poses are wired up and ready for the remaining ~15 screens.
+
+## Exercise library
+
+`/exercises` contains 50 structured movement definitions. Each entry includes
+its Chinese and English name, level, target muscles, equipment, default volume,
+three coaching cues, contraindicated body conditions and a mascot pose.
+
+Safety filtering runs before search and UI filtering. A saved knee, lower-back,
+shoulder or wrist condition therefore removes conflicting movements from the
+available source rather than merely hiding a warning on their cards. Venue
+support is applied in the same pass, so home and outdoor users do not see
+gym-only machines.
+
+These rules are conservative product guardrails, not a diagnosis or a clinical
+exercise prescription. The full movement-to-condition matrix should be
+reviewed by a qualified trainer or physical therapist before release.
+
+Each exercise also reserves an `exercise-<id>` animation asset name. Until a
+biomechanically reviewed Lottie or Rive animation exists, the app shows the
+honest still mascot fallback instead of treating decorative motion as form
+instruction.
 
 ## Structure
 

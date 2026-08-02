@@ -9,6 +9,8 @@
  */
 
 import { streamCoachTurn, type AIStyle, type CoachRequest } from "./coach";
+import { openRealtime } from "./realtime";
+import { recognizeEquipment, validateImage } from "./vision";
 import {
     activePlan,
     equipmentFromMemories,
@@ -25,6 +27,10 @@ export interface Env {
     ANTHROPIC_API_KEY: string;
     /** Shared secret the iOS app sends. Set via: wrangler secret put APP_SHARED_SECRET */
     APP_SHARED_SECRET: string;
+    /** Kimi vision key. Set via: wrangler secret put KIMI_API_KEY */
+    KIMI_API_KEY: string;
+    /** MiniMax realtime voice key. Set via: wrangler secret put MINIMAX_API_KEY */
+    MINIMAX_API_KEY: string;
 }
 
 function json(data: unknown, status = 200): Response {
@@ -142,6 +148,75 @@ export default {
                     return { ok: true, plan: checked.plan };
                 },
             });
+        }
+
+        // Realtime voice. The device upgrades to a WebSocket here; the key is
+        // attached on the upstream leg only.
+        if (url.pathname === "/realtime") {
+            if (!isAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
+            if (!env.MINIMAX_API_KEY) return json({ error: "voice_not_configured" }, 503);
+
+            const userID = url.searchParams.get("user") ?? "demo";
+            await ensureUser(env, userID);
+            const memories = await env.DB.prepare(
+                `SELECT text FROM memories WHERE user_id = ? AND active = 1 ORDER BY created_at`
+            )
+                .bind(userID)
+                .all<{ text: string }>();
+
+            return openRealtime(
+                request,
+                env,
+                userID,
+                (memories.results ?? []).map((r) => r.text)
+            );
+        }
+
+        // Gym photo → equipment. Confirmed items are written straight to
+        // memories, which is what the plan shortlist filters on.
+        if (url.pathname === "/vision/equipment") {
+            if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+            if (!isAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
+
+            let body: { imageData?: string; goal?: string; save?: boolean };
+            try {
+                body = (await request.json()) as typeof body;
+            } catch {
+                return json({ error: "invalid_json" }, 400);
+            }
+
+            // Validate the request before the server's own config — a client with a
+            // bad image should hear about the image, not about our secrets.
+            const check = validateImage(body.imageData);
+            if (!check.ok) return json({ error: "invalid_image", detail: check.reason }, 400);
+            if (!env.KIMI_API_KEY) return json({ error: "vision_not_configured" }, 503);
+
+            let result;
+            try {
+                result = await recognizeEquipment(body.imageData!, env.KIMI_API_KEY, body.goal ?? "");
+            } catch (error) {
+                const reason = error instanceof Error ? error.message : "kimi_unavailable";
+                return json({ error: reason }, reason === "kimi_rate_limited" ? 429 : 502);
+            }
+
+            // Only the confirmed ones become memories, and only when asked —
+            // the client may want the user to review first.
+            const userID = url.searchParams.get("user");
+            if (userID && body.save !== false && result.equipment.length) {
+                await ensureUser(env, userID);
+                const now = new Date().toISOString();
+                await env.DB.batch(
+                    result.equipment.map((item) =>
+                        env.DB.prepare(
+                            `INSERT INTO memories (id, user_id, category, text, active, source, created_at, updated_at)
+                             VALUES (?, ?, 'equipment', ?, 1, 'vision', ?, ?)
+                             ON CONFLICT(id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at, active = 1`
+                        ).bind(`equip-${userID}-${item.name}`, userID, item.name, now, now)
+                    )
+                );
+            }
+
+            return json(result);
         }
 
         // The catalogue-backed plan endpoints. All of them need a user id so

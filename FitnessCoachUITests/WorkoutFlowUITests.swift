@@ -39,6 +39,25 @@ final class WorkoutFlowUITests: XCTestCase {
     /// 4 + 4 + 3 + 3 + 3 + 3
     private static let plannedSets = 20
 
+    // MARK: - Exercise library
+
+    func testExerciseLibraryFiltersKneeContraindicationsBeforeSearch() {
+        let app = launch(route: "/exercises")
+
+        XCTAssertTrue(app.staticTexts["动作库"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["34 个适合你 · 完整库 50 个"].exists)
+        XCTAssertTrue(app.staticTexts["猫牛式"].exists)
+
+        // The demo profile has a knee condition. Searching cannot bring a
+        // contraindicated movement back after the safety filter has run.
+        let search = app.textFields["搜索动作、部位或器械"]
+        XCTAssertTrue(search.exists)
+        search.tap()
+        search.typeText("高脚杯深蹲")
+        XCTAssertTrue(app.staticTexts["没有匹配的动作"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["高脚杯深蹲"].exists)
+    }
+
     // MARK: - Welcome
 
     /// A new user answers four questions, and every answer is a memory chip on

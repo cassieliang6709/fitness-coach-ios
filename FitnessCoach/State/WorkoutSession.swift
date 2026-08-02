@@ -19,6 +19,10 @@ final class WorkoutSession {
             daily.style = aiStyle
             strength.style = aiStyle
             cardio.style = aiStyle
+            // Writes through so the plan tab's picker outlives the launch. The
+            // store no-ops when the value is unchanged, which covers the
+            // assignment in `init` that only reads the stored style back.
+            store.updateStyle(aiStyle)
         }
     }
 

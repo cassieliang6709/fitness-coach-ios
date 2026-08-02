@@ -74,6 +74,18 @@ final class RealtimeSession {
     /// handoff's 550 ms minimum for the web VAD.
     private let minimumSpeechDuration: TimeInterval = 0.55
 
+    /// Automatic retries since the last clean turn. A dead or misconfigured
+    /// upstream drops the socket the moment it is opened, so an uncapped retry
+    /// hammers the gateway several times a second and buries the real error.
+    private var reconnectAttempts = 0
+    private let maximumReconnectAttempts = 3
+    private var reconnectTask: Task<Void, Never>?
+
+    /// The gateway explains *why* upstream failed in an `error` frame and then
+    /// drops the socket. Kept so the close, which carries no detail, reports
+    /// that reason instead of a generic "disconnected".
+    private var lastUpstreamError: String?
+
     // MARK: - Connection
 
     func connect() {
@@ -109,7 +121,18 @@ final class RealtimeSession {
         }
     }
 
+    /// User-initiated close: also clears the retry budget, so leaving the screen
+    /// and coming back starts fresh rather than inheriting a spent one.
     func disconnect() {
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        reconnectAttempts = 0
+        teardown()
+        status = .idle
+    }
+
+    /// Drops the socket and audio without touching `status` or the retry budget.
+    private func teardown() {
         receiveLoop?.cancel()
         receiveLoop = nil
         playbackWatch?.cancel()
@@ -119,20 +142,40 @@ final class RealtimeSession {
         audio.stop()
         pendingChunks = 0
         speechStartedAt = nil
-        status = .idle
     }
 
     /// A failed upstream turn cannot be resumed — MiniMax rejects further
     /// appends on a session that already errored — so recovery is a full
     /// reconnect under the same conversation id.
+    ///
+    /// Gives up after a few tries and leaves the manual 重连 button as the way
+    /// back: if the gateway's upstream is wrong or its key is rejected, every
+    /// retry fails identically and silently retrying forever hides that.
     private func reconnect(reason: String) {
-        disconnect()
+        guard reconnectAttempts < maximumReconnectAttempts else {
+            teardown()
+            status = .failed("\(reason)（已重试 \(maximumReconnectAttempts) 次，请检查网关）")
+            return
+        }
+
+        let attempt = reconnectAttempts + 1
+        teardown()
+        reconnectAttempts = attempt
         status = .failed(reason)
-        Task {
-            try? await Task.sleep(for: .milliseconds(400))
-            guard case .failed = status else { return }
+
+        reconnectTask?.cancel()
+        reconnectTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(400 * (1 << (attempt - 1))))
+            guard let self, !Task.isCancelled, case .failed = status else { return }
             connect()
         }
+    }
+
+    /// Manual retry from the failure banner, which also restores the retry
+    /// budget the automatic path spent.
+    func retry() {
+        reconnectAttempts = 0
+        connect()
     }
 
     // MARK: - Talking
@@ -238,7 +281,7 @@ final class RealtimeSession {
                     }
                 } catch {
                     guard let self, !Task.isCancelled else { return }
-                    reconnect(reason: "连接已断开，正在重连…")
+                    reconnect(reason: lastUpstreamError ?? "连接已断开，正在重连…")
                     return
                 }
             }
@@ -247,6 +290,15 @@ final class RealtimeSession {
 
     private func handle(_ text: String) {
         guard let event = RealtimeServerEvent.decode(text) else { return }
+
+        // A *non-error* event is the only honest sign the connection is usable:
+        // `.ready` is set optimistically before the socket can fail, and the
+        // gateway's own failure notice arrives as a normal frame, so counting
+        // any traffic as success makes the retry budget reset forever.
+        if event.type != "error" {
+            reconnectAttempts = 0
+            lastUpstreamError = nil
+        }
 
         switch event.type {
         case "conversation.item.created":
@@ -278,6 +330,7 @@ final class RealtimeSession {
 
         case "error":
             let message = event.error?.message ?? "实时会话出错"
+            lastUpstreamError = message
             // Anything the upstream says about the audio buffer means this
             // session is unusable; everything else is a recoverable turn error.
             if message.contains("input_audio") || event.error?.code?.contains("input_audio") == true

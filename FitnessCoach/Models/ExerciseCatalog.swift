@@ -228,7 +228,8 @@ enum ExerciseCatalog {
         ),
         item(
             "glute-bridge", "臀桥", "Glute Bridge", .beginner, .strength, [.glutes],
-            secondary: [.hamstrings, .core], equipment: [.bodyweight, .mat], prescription: "4 × 12–15",
+            secondary: [.hamstrings, .core], equipment: [.bodyweight, .mat],
+            prescription: "4 × 12–15",
             tips: ["脚跟靠近臀部并踩稳", "先收紧腹部再抬起骨盆", "顶端夹紧臀部，不要用腰过度后仰"],
             pose: .thumbsUp
         ),
@@ -240,7 +241,8 @@ enum ExerciseCatalog {
         ),
         item(
             "romanian-deadlift", "罗马尼亚硬拉", "Romanian Deadlift", .intermediate,
-            .strength, [.hamstrings, .glutes], secondary: [.back], equipment: [.dumbbell, .barbell],
+            .strength, [.hamstrings, .glutes], secondary: [.back],
+            equipment: [.dumbbell, .barbell],
             prescription: "3–4 × 8–12",
             tips: ["膝盖保持微屈", "髋部向后推，重量贴近腿部", "背部保持中立，感到腿后侧拉伸后站起"],
             avoid: [.lowBack], venues: [.gym, .home], pose: .dumbbell
@@ -306,7 +308,8 @@ enum ExerciseCatalog {
         ),
         item(
             "machine-chest-press", "坐姿推胸", "Machine Chest Press", .beginner, .strength,
-            [.chest], secondary: [.arms, .shoulders], equipment: [.machine], prescription: "3 × 10–15",
+            [.chest], secondary: [.arms, .shoulders], equipment: [.machine],
+            prescription: "3 × 10–15",
             tips: ["座椅调到把手与胸口齐平", "肩胛贴住靠背", "推到手臂接近伸直，不要锁肘"],
             avoid: [.shoulder, .wrist], venues: [.gym], pose: .dumbbell
         ),
@@ -350,7 +353,8 @@ enum ExerciseCatalog {
         ),
         item(
             "assisted-pull-up", "辅助引体向上", "Assisted Pull-Up", .intermediate, .strength,
-            [.back], secondary: [.arms], equipment: [.machine, .pullUpBar], prescription: "3 × 6–10",
+            [.back], secondary: [.arms], equipment: [.machine, .pullUpBar],
+            prescription: "3 × 6–10",
             tips: ["起始时先让肩胛下沉", "胸口朝向把手拉起", "缓慢下降到手臂接近伸直"],
             avoid: [.shoulder, .wrist], venues: [.gym], pose: .dumbbell
         ),
@@ -464,7 +468,8 @@ enum ExerciseCatalog {
         ),
         item(
             "farmers-carry", "农夫行走", "Farmer's Carry", .intermediate, .strength,
-            [.fullBody, .core], secondary: [.arms, .shoulders], equipment: [.dumbbell, .kettlebell],
+            [.fullBody, .core], secondary: [.arms, .shoulders],
+            equipment: [.dumbbell, .kettlebell],
             prescription: "3 × 30–45 秒",
             tips: ["两侧重量保持一致", "站高并让肩胛稳定下沉", "小步直线行走，身体不要左右倾斜"],
             avoid: [.wrist, .shoulder, .lowBack], venues: [.gym, .home], pose: .dumbbell

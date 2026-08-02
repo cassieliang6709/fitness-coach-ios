@@ -6,3 +6,9 @@ xcuserdata/
 *.xcworkspace/xcuserdata/
 .swiftpm/
 Secrets.xcconfig
+
+# Coach Gateway runtime state and vendor keys — never commit these.
+Vance_Coach_Gateway_Handoff_20260802/.env
+Vance_Coach_Gateway_Handoff_20260802/data/
+Vance_Coach_Gateway_Handoff_20260802/logs/
+Vance_Coach_Gateway_Handoff_20260802/public/

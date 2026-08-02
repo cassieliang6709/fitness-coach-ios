@@ -5,6 +5,7 @@ import SwiftUI
 enum Route: Hashable {
     case home
     case plans
+    case exerciseLibrary
     case legDay
     case strength
     case cardio
@@ -15,6 +16,7 @@ enum Route: Hashable {
         switch self {
         case .home: return "/home"
         case .plans: return "/plans"
+        case .exerciseLibrary: return "/exercises"
         case .legDay: return "/plans/leg-day"
         case .strength: return "/workout/strength"
         case .cardio: return "/workout/cardio"
@@ -28,7 +30,9 @@ enum Route: Hashable {
         self = match
     }
 
-    static let all: [Route] = [.home, .plans, .legDay, .strength, .cardio, .review, .realtime]
+    static let all: [Route] = [
+        .home, .plans, .exerciseLibrary, .legDay, .strength, .cardio, .review, .realtime,
+    ]
 }
 
 struct RootView: View {
@@ -55,6 +59,8 @@ struct RootView: View {
                         HomeView(path: $path)
                     case .plans:
                         PlanLibraryView(path: $path)
+                    case .exerciseLibrary:
+                        ExerciseLibraryView(path: $path)
                     case .legDay:
                         LegDayDetailView(path: $path)
                     case .strength:

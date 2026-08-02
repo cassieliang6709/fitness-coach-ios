@@ -22,6 +22,10 @@ struct PlanLibraryView: View {
                     MemoryChipRow(memories: memories.map(\.asMemory))
                         .padding(.bottom, 2)
 
+                    ExerciseLibraryTeaser {
+                        path.append(.exerciseLibrary)
+                    }
+
                     PlanCard(plan: session.plan, featured: true, selected: true)
 
                     ForEach(MockData.otherPlans) { plan in

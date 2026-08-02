@@ -53,6 +53,21 @@ final class WorkoutStore {
 
     var weeklyTarget: Int { profile()?.weeklyTarget ?? 4 }
 
+    /// Persist a tone change made after onboarding, so the picker on the plan
+    /// tab survives a relaunch instead of snapping back to the welcome answer.
+    func updateStyle(_ style: AIStyle) {
+        let singletonID = ProfileRecord.singletonID
+        let descriptor = FetchDescriptor<ProfileRecord>(
+            predicate: #Predicate { $0.id == singletonID }
+        )
+        guard let existing = try? context.fetch(descriptor).first,
+            existing.aiStyleRaw != style.rawValue
+        else { return }
+
+        existing.aiStyleRaw = style.rawValue
+        save()
+    }
+
     /// Closes the welcome flow: stores the answers and turns each one into a
     /// memory chip, so the coach starts already knowing this user.
     func completeOnboarding(_ profile: UserProfile) {

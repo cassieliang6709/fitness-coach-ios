@@ -9,6 +9,7 @@ import SwiftUI
 /// switch so it reads as one place.
 struct HomeView: View {
     @Environment(WorkoutSession.self) private var session
+    @Environment(\.workoutStore) private var store
     @Binding var path: [Route]
 
     @State private var tab = HomeTab.chat
@@ -66,8 +67,12 @@ struct HomeView: View {
         }
     }
 
+    /// On the plan tab this reads the welcome answers back to the user — without
+    /// it the goal and venue they picked never appear on the page that measures
+    /// them. Falls back to a description when there is no profile yet.
     private var subtitle: String {
-        tab == .chat ? "今天想练点什么？说一句就行。" : "今天的安排和你的记录"
+        guard tab == .plan else { return "今天想练点什么？说一句就行。" }
+        return store?.profile()?.summary ?? "今天的安排和你的记录"
     }
 }
 

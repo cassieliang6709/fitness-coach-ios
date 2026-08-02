@@ -65,7 +65,7 @@ struct RealtimeCoachView: View {
             }
 
             if case .failed = session.status {
-                Button("重连") { session.connect() }
+                Button("重连") { session.retry() }
                     .font(Theme.caption)
                     .foregroundStyle(Theme.primary)
             }
@@ -139,7 +139,8 @@ struct RealtimeCoachView: View {
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
-                    .background(Circle().fill(canSend ? Theme.primary : Theme.primary.opacity(0.35)))
+                    .background(
+                        Circle().fill(canSend ? Theme.primary : Theme.primary.opacity(0.35)))
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
