@@ -22,10 +22,22 @@ final class CoachThread {
     /// Kimi-backed gym equipment recognition. Its result stays in this same
     /// thread and becomes context for the next realtime turn.
     var vision: GymVisionAPI?
+    /// Kimi-backed asynchronous memory extraction. It never sits on the
+    /// request/response path of a coaching turn.
+    var memorySummarizer: MemorySummaryAPI?
     /// Supplies the live training state sent with every request.
     var contextProvider: (@MainActor () -> CoachContext)?
     /// Active memory chips, sent so the coach knows the user's history.
     var memoryProvider: (@MainActor () -> [String])?
+    /// Existing non-location memories used only for Kimi's dedupe pass.
+    var memorySummaryProvider: (@MainActor () -> [String])?
+    /// Commits sanitized Kimi summary output to the local SwiftData store.
+    var memoryUpdateHandler: (@MainActor ([MemorySummary.Update]) -> Void)?
+    /// Commits the high-confidence photo facts and optional device location.
+    var gymObservationHandler: (@MainActor (GymVisionResult, GymLocationSnapshot?) -> Void)?
+    /// Persists the user-authorized location even if Kimi cannot recognize the
+    /// image or the network request fails.
+    var gymLocationHandler: (@MainActor (GymLocationSnapshot) -> Void)?
     /// Executes a coach action against session state and returns the tool
     /// result string the model sees next turn.
     var actionHandler: (@MainActor (CoachAction) -> String)?
@@ -50,6 +62,7 @@ final class CoachThread {
     private var realtimeBubbleID: String?
     private var recognizedEquipment: [String] = []
     private(set) var isVisionRecognizing = false
+    private var memorySummaryWork: Task<Void, Never>?
 
     var isLive: Bool { api != nil || realtime != nil }
 
@@ -158,6 +171,7 @@ final class CoachThread {
             }
             self.voiceState = .processing
             self.append(.init(role: .user, content: transcript))
+            self.scheduleMemorySummary(transcript: ["用户：\(transcript)"])
             self.work = Task {
                 self.voiceState = .speaking
                 if self.isLive {
@@ -182,6 +196,7 @@ final class CoachThread {
             return
         }
         append(.init(role: .user, content: turn.userText))
+        scheduleMemorySummary(transcript: ["用户：\(turn.userText)"])
         voiceState = .speaking
         if isLive {
             await runLiveTurn(userText: turn.userText)
@@ -218,6 +233,7 @@ final class CoachThread {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isBusy, work == nil else { return }
         append(.init(role: .user, content: trimmed))
+        scheduleMemorySummary(transcript: ["用户：\(trimmed)"])
 
         if let realtime {
             guard let context = currentContext() else { return }
@@ -263,14 +279,23 @@ final class CoachThread {
         vision = client
     }
 
+    func configureMemorySummarizer(_ client: MemorySummaryAPI) {
+        memorySummarizer = client
+    }
+
     /// Keeps photo recognition as a turn in the existing conversation. It
     /// intentionally renders only high-confidence device names and leaves the
     /// actual exercise guidance to the following voice turn.
-    func recognizeGymEquipment(imageData: Data, mimeType: String) async {
+    func recognizeGymEquipment(
+        imageData: Data,
+        mimeType: String,
+        location: GymLocationSnapshot?
+    ) async {
         guard !isVisionRecognizing, let vision, let context = currentContext() else { return }
         isVisionRecognizing = true
         let photoMessage = ChatMessage(role: .user, content: "📷 已上传健身房照片，正在识别器械…")
         append(photoMessage)
+        if let location { gymLocationHandler?(location) }
 
         defer { isVisionRecognizing = false }
         do {
@@ -283,6 +308,13 @@ final class CoachThread {
             )
             update(id: photoMessage.id, content: "📷 已上传健身房照片")
             recognizedEquipment = result.equipment.map(\.name)
+            gymObservationHandler?(result, location)
+            scheduleMemorySummary(
+                transcript: [
+                    "用户上传了健身房照片。",
+                    "已确认器械：\(recognizedEquipment.joined(separator: "、"))。",
+                ]
+            )
 
             let reply: String
             if recognizedEquipment.isEmpty {
@@ -304,6 +336,34 @@ final class CoachThread {
         return context
     }
 
+    /// Snapshot the small, untrusted event payload before starting an async
+    /// network wait. UI updates are handed back through the main-actor closure,
+    /// so an unavailable Kimi endpoint can never stall the live coach.
+    private func scheduleMemorySummary(transcript: [String]) {
+        guard
+            let memorySummarizer,
+            let memoryUpdateHandler
+        else { return }
+        let memories = memorySummaryProvider?() ?? memoryProvider?() ?? []
+        // Keep one current summary worker per coaching thread. A newer user
+        // turn supersedes stale context instead of building a request queue.
+        memorySummaryWork?.cancel()
+        memorySummaryWork = Task(priority: .background) {
+            guard !Task.isCancelled else { return }
+            do {
+                let summary = try await memorySummarizer.summarize(
+                    transcript: transcript,
+                    existingMemories: memories
+                )
+                guard !Task.isCancelled, !summary.updates.isEmpty else { return }
+                memoryUpdateHandler(summary.updates)
+            } catch {
+                // Summaries are an enhancement. The next turn and local data
+                // remain usable when Kimi is offline or times out.
+            }
+        }
+    }
+
     private func handleRealtimeEvent(_ event: RealtimeCoachClient.Event) {
         switch event {
         case .connected:
@@ -311,6 +371,7 @@ final class CoachThread {
         case .userTranscript(let text):
             guard !text.isEmpty else { return }
             append(.init(role: .user, content: text))
+            scheduleMemorySummary(transcript: ["用户：\(text)"])
         case .assistantDelta(let delta):
             voiceState = .speaking
             isTyping = false

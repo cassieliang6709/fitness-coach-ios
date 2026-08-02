@@ -8,7 +8,7 @@ MiniMax / Kimi provider keys on the server.
 ```bash
 cd vance-gateway
 cp .env.example .env
-# Add MINIMAX_API_KEY. Add KIMI_API_KEY only when testing photo recognition.
+# Add MINIMAX_API_KEY. Add KIMI_API_KEY for photo recognition and background memory summaries.
 node server.mjs
 ```
 
@@ -51,6 +51,7 @@ Never add `MINIMAX_API_KEY` or `KIMI_API_KEY` to the Xcode configuration.
 | `GET /health` | Configuration and prompt-version probe; never returns keys |
 | `GET /realtime` (WebSocket upgrade) | 24kHz PCM16 realtime voice events |
 | `POST /api/gym-vision` | Kimi K2.6 high-confidence equipment recognition |
+| `POST /api/memory-summary` | Kimi K2.6 durable-memory extraction; returns only sanitized additions/updates |
 
 The WebSocket accepts a `vance.session.configure` event. The service converts
 it to MiniMax's session configuration and injects the server-owned Vance Prompt.

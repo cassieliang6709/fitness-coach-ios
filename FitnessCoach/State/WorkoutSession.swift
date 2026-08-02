@@ -122,6 +122,12 @@ final class WorkoutSession {
         return GymVisionAPI(config: config)
     }
 
+    private static func makeMemorySummarizer() -> MemorySummaryAPI? {
+        if ProcessInfo.processInfo.arguments.contains("-uitest") { return nil }
+        guard let config = VanceGatewayConfig.fromBundle() else { return nil }
+        return MemorySummaryAPI(config: config)
+    }
+
     private func makeDailyThread() {
         daily = CoachThread(
             opening: MockData.homeOpening,
@@ -168,9 +174,39 @@ final class WorkoutSession {
         if let vision = Self.makeVision() {
             thread.configureVision(vision)
         }
+        if let summarizer = Self.makeMemorySummarizer() {
+            thread.configureMemorySummarizer(summarizer)
+        }
         thread.speech = speech
         thread.memoryProvider = { [weak self] in
             self?.store.activeMemories().map(\.text) ?? []
+        }
+        // Location records stay on-device. Kimi does not need them to decide
+        // whether a new preference or injury fact duplicates an old memory.
+        thread.memorySummaryProvider = { [weak self] in
+            self?.store.activeMemories()
+                .filter { $0.category != .venue }
+                .map(\.text) ?? []
+        }
+        thread.memoryUpdateHandler = { [weak self] updates in
+            guard let self else { return }
+            for update in updates {
+                switch update.operation {
+                case .upsert:
+                    self.store.upsertMemory(
+                        id: "kimi-\(update.id)",
+                        category: update.category,
+                        text: update.text,
+                        sourceSessionID: self.record?.id
+                    )
+                }
+            }
+        }
+        thread.gymObservationHandler = { [weak self] result, location in
+            self?.store.recordGymObservation(equipment: result.equipment, location: location)
+        }
+        thread.gymLocationHandler = { [weak self] location in
+            self?.store.recordGymLocation(location)
         }
         thread.contextProvider = { [weak self] in
             self?.coachContext(phase: phase)

@@ -1,6 +1,6 @@
 import SwiftData
 import SwiftUI
-import PhotosUI
+import CoreLocation
 import UIKit
 
 /// /home — the app's root after onboarding.
@@ -145,7 +145,8 @@ private struct HomeInputBar: View {
     @Bindable var thread: CoachThread
 
     @State private var draft = ""
-    @State private var photoItem: PhotosPickerItem?
+    @State private var isShowingCamera = false
+    @State private var cameraUnavailable = false
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -186,7 +187,13 @@ private struct HomeInputBar: View {
                 .background(Capsule(style: .continuous).fill(Theme.surface))
                 .overlay(Capsule(style: .continuous).strokeBorder(Theme.border, lineWidth: 1))
 
-                PhotosPicker(selection: $photoItem, matching: .images) {
+                Button {
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        isShowingCamera = true
+                    } else {
+                        cameraUnavailable = true
+                    }
+                } label: {
                     Image(systemName: "camera.viewfinder")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Theme.primary)
@@ -195,7 +202,7 @@ private struct HomeInputBar: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(thread.isVisionRecognizing || thread.isBusy)
-                .accessibilityLabel("上传器械图")
+                .accessibilityLabel("拍摄器械图")
 
                 IconButton(
                     symbol: thread.voiceState == .idle ? "mic.fill" : "stop.fill",
@@ -213,24 +220,32 @@ private struct HomeInputBar: View {
         }
         .animation(.easeInOut(duration: 0.2), value: thread.voiceState)
         .animation(.easeInOut(duration: 0.2), value: thread.isVisionRecognizing)
-        .onChange(of: photoItem) { _, item in
-            guard let item else { return }
-            Task {
-                do {
-                    guard
-                        let data = try await item.loadTransferable(type: Data.self),
-                        let image = UIImage(data: data),
-                        let jpeg = image.jpegData(compressionQuality: 0.85)
-                    else {
-                        return
-                    }
-                    await thread.recognizeGymEquipment(imageData: jpeg, mimeType: "image/jpeg")
-                } catch {
-                    // The thread already has a user-facing recovery path when
-                    // the gateway rejects a valid photo. Loading failures stay local.
-                }
-                photoItem = nil
-            }
+        .sheet(isPresented: $isShowingCamera) {
+            GymCameraPicker(
+                onCapture: capture,
+                onDismiss: { isShowingCamera = false }
+            )
+            .ignoresSafeArea()
+        }
+        .alert("无法使用相机", isPresented: $cameraUnavailable) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text("请在真机上允许相机权限后再拍摄器械。")
+        }
+    }
+
+    private func capture(_ image: UIImage) {
+        Task {
+            guard let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
+            // iOS presents the foreground-location prompt only after the
+            // user has deliberately taken a photo. A denial is allowed:
+            // the equipment still saves, simply without a place record.
+            let location = await GymLocationService.shared.currentLocation()
+            await thread.recognizeGymEquipment(
+                imageData: jpeg,
+                mimeType: "image/jpeg",
+                location: location
+            )
         }
     }
 
@@ -242,6 +257,127 @@ private struct HomeInputBar: View {
         guard canSend else { return }
         thread.send(text: draft)
         draft = ""
+    }
+}
+
+// MARK: - Native camera and foreground location
+
+/// `UIImagePickerController` is used deliberately: unlike a photo picker it
+/// invokes the device camera and its system permission sheet directly.
+private struct GymCameraPicker: UIViewControllerRepresentable {
+    let onCapture: (UIImage) -> Void
+    let onDismiss: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onCapture: onCapture, onDismiss: onDismiss)
+    }
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.cameraCaptureMode = .photo
+        picker.allowsEditing = false
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let onCapture: (UIImage) -> Void
+        let onDismiss: () -> Void
+
+        init(onCapture: @escaping (UIImage) -> Void, onDismiss: @escaping () -> Void) {
+            self.onCapture = onCapture
+            self.onDismiss = onDismiss
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            guard let image = info[.originalImage] as? UIImage else {
+                picker.dismiss(animated: true, completion: onDismiss)
+                return
+            }
+            picker.dismiss(animated: true) {
+                self.onDismiss()
+                self.onCapture(image)
+            }
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            picker.dismiss(animated: true, completion: onDismiss)
+        }
+    }
+}
+
+@MainActor
+private final class GymLocationService: NSObject, CLLocationManagerDelegate {
+    static let shared = GymLocationService()
+
+    private let manager = CLLocationManager()
+    private var authorizationContinuation: CheckedContinuation<Bool, Never>?
+    private var locationContinuation: CheckedContinuation<GymLocationSnapshot?, Never>?
+
+    private override init() {
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+    }
+
+    func currentLocation() async -> GymLocationSnapshot? {
+        guard CLLocationManager.locationServicesEnabled() else { return nil }
+        let status = manager.authorizationStatus
+        let authorized: Bool
+        if status == .notDetermined {
+            authorized = await requestAuthorization()
+        } else {
+            authorized = status == .authorizedAlways || status == .authorizedWhenInUse
+        }
+        guard authorized else { return nil }
+        return await requestLocation()
+    }
+
+    private func requestAuthorization() async -> Bool {
+        await withCheckedContinuation { continuation in
+            authorizationContinuation = continuation
+            manager.requestWhenInUseAuthorization()
+        }
+    }
+
+    private func requestLocation() async -> GymLocationSnapshot? {
+        await withCheckedContinuation { continuation in
+            locationContinuation = continuation
+            manager.requestLocation()
+        }
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard let continuation = authorizationContinuation else { return }
+        authorizationContinuation = nil
+        let status = manager.authorizationStatus
+        continuation.resume(returning: status == .authorizedAlways || status == .authorizedWhenInUse)
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let continuation = locationContinuation else { return }
+        locationContinuation = nil
+        guard let location = locations.last, location.horizontalAccuracy >= 0 else {
+            continuation.resume(returning: nil)
+            return
+        }
+        continuation.resume(returning: GymLocationSnapshot(
+            latitude: location.coordinate.latitude,
+            longitude: location.coordinate.longitude,
+            horizontalAccuracy: location.horizontalAccuracy,
+            capturedAt: .now
+        ))
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        locationContinuation?.resume(returning: nil)
+        locationContinuation = nil
     }
 }
 
@@ -266,6 +402,8 @@ private struct HomePlanTab: View {
         order: .reverse
     )
     private var sessions: [SessionRecord]
+
+    @State private var isShowingMemoryLibrary = false
 
     private var stats: TrainingStats {
         TrainingStats(sessions: sessions, weeklyTarget: store?.weeklyTarget ?? 4)
@@ -355,7 +493,14 @@ private struct HomePlanTab: View {
 
     private var memorySection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionTitle(title: "AI 记住的事", detail: "\(memories.count) 条")
+            HStack {
+                SectionTitle(title: "AI 记住的事", detail: "\(memories.count) 条")
+                Spacer()
+                Button("编辑记忆") { isShowingMemoryLibrary = true }
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.primary)
+                    .accessibilityLabel("编辑记忆")
+            }
 
             if memories.isEmpty {
                 Text("还没有记录。训练时说一句，我就记住了。")
@@ -364,6 +509,9 @@ private struct HomePlanTab: View {
             } else {
                 MemoryChipRow(memories: memories.map(\.asMemory))
             }
+        }
+        .sheet(isPresented: $isShowingMemoryLibrary) {
+            MemoryLibrarySheet()
         }
     }
 

@@ -24,6 +24,8 @@ targets:
         UIUserInterfaceStyle: Light
         NSMicrophoneUsageDescription: 训练中用麦克风听你说话，把不适和反馈告诉教练。
         NSSpeechRecognitionUsageDescription: 把你说的话转成文字发给 AI 教练。识别在设备上完成。
+        NSCameraUsageDescription: 用相机拍摄健身器械，识别后记入你的训练记忆。
+        NSLocationWhenInUseUsageDescription: 拍摄器械时记录所在训练地点，帮助教练记住常去的场馆。
         COACH_API_HOST: $(COACH_API_HOST)
         COACH_SHARED_SECRET: $(COACH_SHARED_SECRET)
         VANCE_GATEWAY_HOST: $(VANCE_GATEWAY_HOST)

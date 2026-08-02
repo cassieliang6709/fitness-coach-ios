@@ -15,11 +15,24 @@ the coach's first line already reflects them.
 
 | Tab | Contents |
 | --- | --- |
-| 对话 | The daily coach thread, suggestion chips, compact text + mic bar |
-| 我的计划 | Today's plan, this week's stripe, streak / totals, memory chips, recent sessions, tone picker |
+| 对话 | The daily coach thread, suggestion chips, compact text + mic bar, native camera equipment capture |
+| 我的计划 | Today's plan, this week's stripe, streak / totals, editable memory library, recent sessions, tone picker |
 
 Both tabs share the header and the floating tab capsule, so switching reads as
 one place rather than two screens.
+
+## Equipment, place, and memory
+
+The camera button invokes the native iOS camera. After a photo is captured, the
+app requests foreground location access; a denial still permits equipment
+recognition. High-confidence Kimi equipment facts are stored in SwiftData's
+`EquipmentRecord`; authorized coordinates are stored locally in
+`GymLocationRecord` and are never included in the AI memory text. The plan tab
+has **编辑记忆** to add, change, or disable memory chips.
+
+While a conversation is active, a low-priority Kimi summary request extracts
+new durable facts in parallel. It is bounded, server-sanitized, and never
+blocks a coaching turn; failed summaries do not affect local training data.
 
 ## Run
 

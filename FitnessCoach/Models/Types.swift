@@ -101,7 +101,7 @@ struct WorkoutPlan: Identifiable, Hashable {
 
 // MARK: - Memory
 
-enum MemoryCategory: String, Hashable {
+enum MemoryCategory: String, CaseIterable, Hashable, Codable, Sendable {
     case injury
     case preference
     case venue
@@ -115,6 +115,15 @@ enum MemoryCategory: String, Hashable {
         case .equipment: return "dumbbell"
         }
     }
+
+    var label: String {
+        switch self {
+        case .injury: return "身体限制"
+        case .preference: return "训练偏好"
+        case .venue: return "训练地点"
+        case .equipment: return "器械"
+        }
+    }
 }
 
 struct WorkoutMemory: Identifiable, Hashable {
@@ -122,6 +131,22 @@ struct WorkoutMemory: Identifiable, Hashable {
     let category: MemoryCategory
     let text: String
     var active: Bool = true
+}
+
+/// A coordinate captured only after the user has granted foreground location
+/// access. It intentionally contains no reverse-geocoded address so the app
+/// stores the minimum location data needed to recognize a familiar gym.
+struct GymLocationSnapshot: Sendable, Hashable {
+    let latitude: Double
+    let longitude: Double
+    let horizontalAccuracy: Double
+    let capturedAt: Date
+
+    var memoryText: String {
+        // Coordinates remain in GymLocationRecord only. Memories are sent to
+        // the coach, so their display text must never disclose a precise place.
+        "训练地点：已在设备上记录"
+    }
 }
 
 // MARK: - Chat

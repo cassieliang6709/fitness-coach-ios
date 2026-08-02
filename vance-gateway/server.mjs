@@ -4,6 +4,7 @@ import http from 'node:http';
 import tls from 'node:tls';
 import { buildVancePrompt, VANCE_PROMPT_VERSION } from './coach-prompt.mjs';
 import { createKimiGymVisionRequest, parseGymVisionResponse, validateGymVisionInput } from './gym-vision.mjs';
+import { createKimiMemorySummaryRequest, parseMemorySummaryResponse, validateMemorySummaryInput } from './memory-summary.mjs';
 
 loadEnv('.env');
 
@@ -74,6 +75,19 @@ async function handleRequest(request, response) {
     });
     if (!upstream.ok) throw new Error(`Kimi 识别暂时不可用（HTTP ${upstream.status}）`);
     const result = parseGymVisionResponse((await upstream.json()).choices?.[0]?.message?.content);
+    return sendJson(response, 200, result);
+  }
+  if (url.pathname === '/api/memory-summary' && request.method === 'POST') {
+    if (!authorized(request)) return sendJson(response, 401, { error: 'unauthorized' });
+    if (!kimiKey) return sendJson(response, 503, { error: 'KIMI_API_KEY 未配置' });
+    const input = validateMemorySummaryInput(await readJson(request, 128 * 1024));
+    const upstream = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${kimiKey}` },
+      body: JSON.stringify(createKimiMemorySummaryRequest(input)),
+    });
+    if (!upstream.ok) throw new Error(`Kimi 记忆总结暂时不可用（HTTP ${upstream.status}）`);
+    const result = parseMemorySummaryResponse((await upstream.json()).choices?.[0]?.message?.content);
     return sendJson(response, 200, result);
   }
   sendJson(response, 404, { error: 'not_found' });

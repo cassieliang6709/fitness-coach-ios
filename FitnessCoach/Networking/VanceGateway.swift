@@ -60,6 +60,22 @@ struct GymVisionResult: Codable, Hashable {
     let needsConfirmation: [String]
 }
 
+/// A server-sanitized durable memory addition or update.
+struct MemorySummary: Codable, Sendable {
+    struct Update: Codable, Sendable {
+        let id: String
+        let operation: Operation
+        let category: MemoryCategory
+        let text: String
+
+        enum Operation: String, Codable, Sendable {
+            case upsert
+        }
+    }
+
+    let updates: [Update]
+}
+
 struct GymVisionAPI: Sendable {
     let config: VanceGatewayConfig
 
@@ -101,6 +117,41 @@ struct GymVisionAPI: Sendable {
         let imageData: String
         let goal: String
         let userPlan: String
+    }
+}
+
+/// Kimi-backed, low-priority summary call. It is intentionally separate from
+/// realtime coaching: a delayed or unavailable summary must never block a
+/// conversation turn or camera recognition.
+struct MemorySummaryAPI: Sendable {
+    let config: VanceGatewayConfig
+
+    func summarize(transcript: [String], existingMemories: [String]) async throws -> MemorySummary {
+        guard let url = config.httpURL(path: "/api/memory-summary") else {
+            throw VanceGatewayError.notConfigured
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
+        request.setValue("Bearer \(config.sharedSecret)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(Request(
+            transcript: transcript,
+            existingMemories: existingMemories
+        ))
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw VanceGatewayError.invalidResponse }
+        guard http.statusCode == 200 else {
+            let error = try? JSONDecoder().decode(GatewayErrorPayload.self, from: data)
+            throw VanceGatewayError.upstream(error?.error ?? "记忆总结服务不可用（HTTP \(http.statusCode)）")
+        }
+        return try JSONDecoder().decode(MemorySummary.self, from: data)
+    }
+
+    private struct Request: Encodable {
+        let transcript: [String]
+        let existingMemories: [String]
     }
 }
 
