@@ -6,7 +6,11 @@
  * app. The API key stays in the Worker secret store.
  */
 
-const MINIMAX_T2A = "https://api.minimax.io/v1/t2a_v2";
+// api.minimax.io and api.minimax.chat are separate accounts, not mirrors: a key
+// issued for one is rejected by the other as 2049 "invalid api key". This must
+// stay on the same host the realtime upstream uses, or one of the two voices
+// silently stops working.
+const MINIMAX_T2A = "https://api.minimax.chat/v1/t2a_v2";
 
 interface MiniMaxSpeechResponse {
     data?: {
