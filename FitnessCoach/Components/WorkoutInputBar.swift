@@ -11,6 +11,15 @@ struct WorkoutInputBar: View {
 
     var body: some View {
         VStack(spacing: 10) {
+            if let error = thread.lastError {
+                CoachErrorBanner(
+                    message: error,
+                    onRetry: thread.canRetryLastTurn ? { thread.retryLastTurn() } : nil,
+                    onDismiss: { thread.dismissError() }
+                )
+                .transition(.opacity)
+            }
+
             if let label = thread.voiceState.label {
                 VStack(spacing: 4) {
                     Text(label)
@@ -31,6 +40,14 @@ struct WorkoutInputBar: View {
                 .transition(.opacity)
             }
 
+            if let notice = thread.voiceNotice {
+                Text(notice)
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity)
+            }
+
             switch thread.inputMode {
             case .voice:
                 voiceRow
@@ -48,6 +65,8 @@ struct WorkoutInputBar: View {
         .animation(.easeInOut(duration: 0.2), value: thread.inputMode)
         .animation(.easeInOut(duration: 0.2), value: thread.voiceState)
         .animation(.easeInOut(duration: 0.15), value: thread.partialTranscript)
+        .animation(.easeInOut(duration: 0.2), value: thread.voiceNotice)
+        .animation(.easeInOut(duration: 0.2), value: thread.lastError)
     }
 
     // MARK: - Rows

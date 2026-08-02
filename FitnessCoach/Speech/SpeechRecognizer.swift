@@ -16,6 +16,9 @@ final class SpeechRecognizer {
         case unknown
         case ready
         /// Permission denied, restricted, or no recognizer for the locale.
+        /// Only for things a retry cannot fix — everything transient goes to
+        /// `lastFailure` instead, or one bad tap would kill dictation for the
+        /// rest of the app's life.
         case unavailable(String)
     }
 
@@ -23,7 +26,16 @@ final class SpeechRecognizer {
     private(set) var transcript = ""
     private(set) var isRecording = false
 
-    /// Seconds of no new words before the turn is considered finished.
+    /// Why the last attempt ended without words, when the cause was temporary:
+    /// the audio session was busy, the engine wouldn't start, the recognition
+    /// service dropped, a call came in. Cleared at the start of every attempt.
+    private(set) var lastFailure: String?
+
+    /// Seconds of silence before the turn is considered finished. The lead-in
+    /// is longer because it covers the user deciding what to say — partial
+    /// results only start once they actually speak, so a 1.6s window here shut
+    /// the mic off while people were still thinking.
+    private let leadInTimeout: TimeInterval = 5
     private let silenceTimeout: TimeInterval = 1.6
 
     private let recognizer: SFSpeechRecognizer?
@@ -32,16 +44,23 @@ final class SpeechRecognizer {
     private var task: SFSpeechRecognitionTask?
     private var silenceTimer: Task<Void, Never>?
     private var onFinish: ((String) -> Void)?
+    private let observers = ObserverTokens()
 
     init(locale: Locale = Locale(identifier: "zh-CN")) {
         recognizer = SFSpeechRecognizer(locale: locale)
+        observeAudioDisruptions()
     }
 
     // MARK: - Permissions
 
-    /// Asks for speech + microphone access. Safe to call repeatedly.
+    /// Asks for speech + microphone access. Safe to call repeatedly — the
+    /// system only shows a dialog the first time, so callers can re-check after
+    /// a denial in case the user changed their mind in Settings.
     func requestAccess() async {
-        guard recognizer?.isAvailable == true else {
+        // Deliberately not checking `isAvailable` here: it flips with system
+        // and network conditions, so it belongs in the per-attempt check in
+        // `start()`, not in a verdict that sticks.
+        guard recognizer != nil else {
             availability = .unavailable("当前语言的语音识别不可用")
             return
         }
@@ -70,16 +89,30 @@ final class SpeechRecognizer {
     /// Starts listening. `onFinish` fires once with the final transcript —
     /// empty if the user said nothing.
     func start(onFinish: @escaping (String) -> Void) {
-        guard !isRecording, let recognizer, recognizer.isAvailable else { return }
+        // Hand this caller back its turn, but leave the in-flight recording's
+        // own callback alone so the turn already running still delivers.
+        guard !isRecording else {
+            lastFailure = "上一次录音还没结束"
+            onFinish("")
+            return
+        }
 
         self.onFinish = onFinish
         transcript = ""
+        lastFailure = nil
+
+        // Checked per attempt, not once: `isAvailable` goes false while the
+        // system is busy or offline and comes back on its own. Returning here
+        // without calling back would leave the caller stuck in "listening".
+        guard let recognizer, recognizer.isAvailable else {
+            fail("语音识别暂时不可用，稍后再试", onFinish: onFinish)
+            return
+        }
 
         do {
             try configureSession()
         } catch {
-            availability = .unavailable("无法启动录音")
-            onFinish("")
+            fail("无法开始录音，可能有其他应用正在占用麦克风", onFinish: onFinish)
             return
         }
 
@@ -92,6 +125,13 @@ final class SpeechRecognizer {
 
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
+        // A zero-rate format means the input route isn't up yet — right after a
+        // call, or while another engine is tearing down. Installing a tap with
+        // it traps inside AVAudioEngine instead of throwing.
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            fail("麦克风还没准备好，再试一次", onFinish: onFinish)
+            return
+        }
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
             request.append(buffer)
@@ -102,13 +142,12 @@ final class SpeechRecognizer {
             try engine.start()
         } catch {
             cleanUp()
-            availability = .unavailable("无法启动录音")
-            onFinish("")
+            fail("无法开始录音，可能有其他应用正在占用麦克风", onFinish: onFinish)
             return
         }
 
         isRecording = true
-        armSilenceTimer()
+        armSilenceTimer(after: leadInTimeout)
 
         task = recognizer.recognitionTask(with: request) { [weak self] result, error in
             Task { @MainActor [weak self] in
@@ -118,9 +157,14 @@ final class SpeechRecognizer {
                     if result.isFinal {
                         self.finish()
                     } else {
-                        self.armSilenceTimer()
+                        self.armSilenceTimer(after: self.silenceTimeout)
                     }
                 } else if error != nil {
+                    // Mid-sentence drops still deliver what was heard; only a
+                    // turn with nothing at all needs explaining to the user.
+                    if self.transcript.isEmpty {
+                        self.lastFailure = "语音识别中断了，再说一次"
+                    }
                     self.finish()
                 }
             }
@@ -151,14 +195,70 @@ final class SpeechRecognizer {
         try session.setActive(true, options: .notifyOthersOnDeactivation)
     }
 
+    /// Ends the attempt without a transcript, keeping `availability` intact so
+    /// the next tap tries again.
+    private func fail(_ reason: String, onFinish: (String) -> Void) {
+        lastFailure = reason
+        self.onFinish = nil
+        onFinish("")
+    }
+
     /// Restarted on every partial result; firing means the user stopped talking.
-    private func armSilenceTimer() {
+    private func armSilenceTimer(after seconds: TimeInterval) {
         silenceTimer?.cancel()
-        silenceTimer = Task { [silenceTimeout] in
-            try? await Task.sleep(for: .seconds(silenceTimeout))
+        silenceTimer = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
-            finish()
+            self?.finish()
         }
+    }
+
+    /// A call, Siri, or an unplugged headset stops the engine underneath us and
+    /// the recognizer never hears another buffer. Without this the turn sits in
+    /// "listening" until the user taps again.
+    private func observeAudioDisruptions() {
+        let center = NotificationCenter.default
+        let session = AVAudioSession.sharedInstance()
+        let handler: @Sendable (Notification) -> Void = { [weak self] note in
+            Task { @MainActor in self?.handleDisruption(note) }
+        }
+        observers.tokens = [
+            center.addObserver(
+                forName: AVAudioSession.interruptionNotification,
+                object: session, queue: nil, using: handler),
+            center.addObserver(
+                forName: AVAudioSession.routeChangeNotification,
+                object: session, queue: nil, using: handler),
+            center.addObserver(
+                forName: .AVAudioEngineConfigurationChange,
+                object: engine, queue: nil, using: handler),
+        ]
+    }
+
+    private func handleDisruption(_ note: Notification) {
+        guard isRecording else { return }
+
+        switch note.name {
+        case AVAudioSession.interruptionNotification:
+            let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            guard raw == AVAudioSession.InterruptionType.began.rawValue else { return }
+
+        case AVAudioSession.routeChangeNotification:
+            // Only the reasons that actually invalidate the input tap. Our own
+            // `setCategory` fires a `.categoryChange` that must be ignored.
+            let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
+            let reason = raw.flatMap(AVAudioSession.RouteChangeReason.init(rawValue:))
+            guard reason == .oldDeviceUnavailable || reason == .newDeviceAvailable else {
+                return
+            }
+
+        default:
+            break
+        }
+
+        // Deliver a partial sentence if there is one — it beats losing the turn.
+        if transcript.isEmpty { lastFailure = "录音被打断了，再说一次" }
+        finish()
     }
 
     private func finish() {
@@ -186,5 +286,17 @@ final class SpeechRecognizer {
         // Hand audio back so music resumes at full volume.
         try? AVAudioSession.sharedInstance().setActive(
             false, options: .notifyOthersOnDeactivation)
+    }
+}
+
+/// Holds the notification tokens outside the main actor so they are removed
+/// when the recognizer goes away — a `deinit` on the recognizer itself can't
+/// touch its own isolated state.
+private final class ObserverTokens: @unchecked Sendable {
+    var tokens: [NSObjectProtocol] = []
+
+    deinit {
+        let center = NotificationCenter.default
+        for token in tokens { center.removeObserver(token) }
     }
 }

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 /// One coaching conversation. Both the strength and cardio pages drive an
 /// instance of this, so the chat UI is written once.
@@ -38,6 +39,11 @@ final class CoachThread {
     /// Live partial transcript, shown under the mic while the user talks.
     var partialTranscript: String { speech?.transcript ?? "" }
 
+    /// Short note about the last voice attempt, shown next to the mic. Every
+    /// path that ends a turn without words sets one — a mic that silently does
+    /// nothing reads as a broken button.
+    private(set) var voiceNotice: String?
+
     private let opening: [CoachLine]
     private let script: [ScriptedTurn]
     private var usedTurns: Set<String> = []
@@ -48,7 +54,17 @@ final class CoachThread {
     /// API-shaped history. Separate from `messages` because Claude needs the
     /// tool_use / tool_result blocks that never render as bubbles.
     private var wire: [WireMessage] = []
+
+    /// What went wrong on the last turn, shown as a banner over the input.
     private(set) var lastError: String?
+    /// The words to re-send when the user taps 重试. Nil when a retry would
+    /// repeat something that already took effect — see `report(_:retrying:)`.
+    private var retryText: String?
+    /// A half-streamed reply left behind by a failed turn. Dropped on retry so
+    /// the coach doesn't answer twice under a truncated first attempt.
+    private var partialBubbleID: String?
+
+    var canRetryLastTurn: Bool { retryText != nil && !isBusy && work == nil }
 
     var isLive: Bool { api != nil }
 
@@ -100,15 +116,22 @@ final class CoachThread {
     /// replays the next scripted turn so demos and the simulator still work.
     func beginVoiceTurn() {
         guard !isBusy, work == nil else { return }
+        voiceNotice = nil
+        clearError()
 
         if let speech {
             work = Task {
-                if speech.availability == .unknown { await speech.requestAccess() }
+                // Re-asked on every attempt, not just the first: the status is
+                // cached by the system once decided, so this costs nothing and
+                // picks up a permission the user granted in Settings after a
+                // denial. Without it one refusal disabled the mic for good.
+                if speech.availability != .ready { await speech.requestAccess() }
                 guard case .ready = speech.availability else {
-                    // Permission denied or no recognizer — degrade, don't dead-end.
-                    lastError = speechFailureMessage
+                    // No recognizer for the locale, or permission refused —
+                    // degrade, don't dead-end.
+                    voiceNotice = speechFailureMessage
                     finishWork()
-                    await runScriptedVoiceTurn()
+                    await degradeVoiceTurn()
                     return
                 }
                 listen(with: speech)
@@ -123,9 +146,22 @@ final class CoachThread {
         }
     }
 
-    private var speechFailureMessage: String? {
+    private var speechFailureMessage: String {
         if case .unavailable(let reason) = speech?.availability { return reason }
-        return nil
+        return "语音暂时不可用"
+    }
+
+    /// Dictation is off for this run. A demo has no microphone at all and the
+    /// script is the whole point, but a live coach must never be handed a
+    /// scripted line as if the user had spoken it — the reply would answer a
+    /// question they never asked. Point them at the keyboard instead.
+    private func degradeVoiceTurn() async {
+        guard !isLive else {
+            inputMode = .text
+            voiceState = .idle
+            return
+        }
+        await runScriptedVoiceTurn()
     }
 
     /// Opens the mic and hands the final transcript to the coach.
@@ -134,10 +170,13 @@ final class CoachThread {
         speech.start { [weak self] transcript in
             guard let self else { return }
             guard !transcript.isEmpty else {
-                // Said nothing — just close the turn.
+                // Nothing heard. Say why — a mic that closes in silence looks
+                // like a dead button, which is how this read in the gym.
+                self.voiceNotice = self.speech?.lastFailure ?? "没听清，再说一次或者直接打字"
                 self.voiceState = .idle
                 return
             }
+            self.voiceNotice = nil
             self.voiceState = .processing
             self.append(.init(role: .user, content: transcript))
             self.work = Task {
@@ -181,6 +220,7 @@ final class CoachThread {
             speech.stop()
             return
         }
+        voiceNotice = nil
         speech?.cancel()
         speaker.stop()
         work?.cancel()
@@ -193,6 +233,9 @@ final class CoachThread {
     func send(text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isBusy, work == nil else { return }
+        voiceNotice = nil
+        // Moving on drops the offer to retry the turn before it.
+        clearError()
         append(.init(role: .user, content: trimmed))
 
         if isLive {
@@ -229,7 +272,7 @@ final class CoachThread {
         guard let api, let context = contextProvider?() else { return }
 
         wire.append(.user(userText))
-        lastError = nil
+        clearError()
         isTyping = true
 
         var streamed = ""
@@ -284,12 +327,17 @@ final class CoachThread {
             }
         } catch {
             isTyping = false
-            lastError = (error as? LocalizedError)?.errorDescription ?? "连接教练失败"
+            // Re-sending is only safe while nothing has taken effect yet. A
+            // stream that died after a tool call or a stored plan has already
+            // changed state, and running the turn again would change it twice.
+            let untouched = toolResults.isEmpty && generatedPlanTitle == nil
+            report(
+                (error as? LocalizedError)?.errorDescription ?? "连接教练失败",
+                retrying: untouched ? userText : nil,
+                discarding: untouched ? bubbleID : nil
+            )
             // Drop the unanswered user turn so the next attempt isn't malformed.
             if wire.last?.role == "user" { wire.removeLast() }
-            let fallback = "网络不稳,先按当前配置继续。"
-            append(.init(role: .assistant, content: fallback))
-            await speak(fallback)
             return
         }
 
@@ -366,7 +414,9 @@ final class CoachThread {
                 }
             }
         } catch {
-            lastError = (error as? LocalizedError)?.errorDescription ?? "连接教练失败"
+            // No retry offered: the tools for this turn have already run, so
+            // re-sending would apply them a second time.
+            report((error as? LocalizedError)?.errorDescription ?? "连接教练失败")
         }
 
         isTyping = false
@@ -379,6 +429,46 @@ final class CoachThread {
     private func update(id: String, content: String) {
         guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
         messages[index].content = content
+    }
+
+    // MARK: - Failures
+
+    /// Records a failure for the banner. `retrying` carries the user's words
+    /// only when re-sending them is side-effect free; `discarding` names a
+    /// half-streamed reply to drop if that retry happens.
+    private func report(
+        _ message: String,
+        retrying userText: String? = nil,
+        discarding bubbleID: String? = nil
+    ) {
+        lastError = message
+        retryText = userText
+        partialBubbleID = bubbleID
+    }
+
+    /// Re-sends the turn that failed. The user's own bubble is still on screen
+    /// from the first attempt, so this goes straight to the wire rather than
+    /// through `send(text:)`, which would post it twice.
+    func retryLastTurn() {
+        guard let text = retryText, !isBusy, work == nil else { return }
+        if let partialBubbleID {
+            messages.removeAll { $0.id == partialBubbleID }
+        }
+        clearError()
+        work = Task {
+            await runLiveTurn(userText: text)
+            finishWork()
+        }
+    }
+
+    func dismissError() {
+        clearError()
+    }
+
+    private func clearError() {
+        lastError = nil
+        retryText = nil
+        partialBubbleID = nil
     }
 
     // MARK: - Internals
@@ -417,6 +507,7 @@ final class CoachThread {
             isTyping = false
             let rendered = line.rendered(for: style)
             append(.init(role: .assistant, content: rendered))
+            CoachLog.thread.info("deliver: \(rendered)")
             await speak(rendered)
             try? await Task.sleep(for: .seconds(0.25))
         }
@@ -425,19 +516,31 @@ final class CoachThread {
     /// TTS is best-effort: a speech outage must never erase or fail a text
     /// reply the user already received. Cancelling the turn stops playback.
     private func speak(_ text: String) async {
-        guard let api, !text.isEmpty, !Task.isCancelled else { return }
+        guard api != nil else { return CoachLog.voice.info("skip: no api") }
+        guard !text.isEmpty else { return CoachLog.voice.info("skip: empty text") }
+        guard !Task.isCancelled else { return CoachLog.voice.info("skip: cancelled before") }
+        guard let api else { return }
 
         voiceState = .processing
         defer { voiceState = .idle }
         do {
+            CoachLog.voice.info("synthesize: \(text.count) chars")
             let audio = try await api.synthesizeSpeech(text)
-            guard !Task.isCancelled else { return }
+            CoachLog.voice.info("synthesized: \(audio.count) bytes")
+            guard !Task.isCancelled else {
+                return CoachLog.voice.info("skip: cancelled after synthesis")
+            }
             voiceState = .speaking
             try await speaker.play(audio)
+            CoachLog.voice.info("played")
         } catch is CancellationError {
+            CoachLog.voice.info("cancelled during playback")
             speaker.stop()
         } catch {
-            lastError = (error as? LocalizedError)?.errorDescription ?? "语音播放失败"
+            CoachLog.voice.error("failed: \(String(describing: error))")
+            // The words already landed as a bubble, so there is nothing to
+            // re-send — only the audio was lost.
+            report((error as? LocalizedError)?.errorDescription ?? "语音播放失败")
         }
     }
 

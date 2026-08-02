@@ -236,6 +236,46 @@ private struct HomeInputBar: View {
     @FocusState private var focused: Bool
 
     var body: some View {
+        VStack(spacing: 8) {
+            if let error = thread.lastError {
+                CoachErrorBanner(
+                    message: error,
+                    onRetry: thread.canRetryLastTurn ? { thread.retryLastTurn() } : nil,
+                    onDismiss: { thread.dismissError() }
+                )
+                .transition(.opacity)
+            }
+
+            // The mic on this page had no feedback at all: no transcript while
+            // listening, nothing when a turn ended empty. Both read as "the
+            // button doesn't work".
+            if let status {
+                Text(status)
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .transition(.opacity)
+            }
+
+            inputRow
+        }
+        .animation(.easeInOut(duration: 0.2), value: thread.voiceState)
+        .animation(.easeInOut(duration: 0.15), value: status)
+        .animation(.easeInOut(duration: 0.2), value: thread.lastError)
+    }
+
+    /// While listening, the words as they land; otherwise why the last attempt
+    /// came back empty.
+    private var status: String? {
+        if thread.voiceState == .listening {
+            return thread.partialTranscript.isEmpty ? "在听…" : thread.partialTranscript
+        }
+        return thread.voiceNotice
+    }
+
+    private var inputRow: some View {
         HStack(spacing: 10) {
             HStack(spacing: 8) {
                 TextField("和教练说点什么…", text: $draft)
@@ -274,7 +314,6 @@ private struct HomeInputBar: View {
             }
             .accessibilityLabel(thread.voiceState == .idle ? "开始语音" : "取消语音")
         }
-        .animation(.easeInOut(duration: 0.2), value: thread.voiceState)
     }
 
     private var canSend: Bool {

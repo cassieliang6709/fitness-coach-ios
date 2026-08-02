@@ -14,6 +14,10 @@ enum Theme {
     static let surface = Color(hex: 0xFAFAFA)
     static let success = Color(hex: 0x22A559)
     static let mascotInk = Color(hex: 0x3D1C0C)
+    // Amber rather than the brand orange: a failure has to read as different
+    // from every accent on the page, and red would overstate a dropped request.
+    static let warning = Color(hex: 0xB45309)
+    static let warningTint = Color(hex: 0xFEF6E7)
 
     // MARK: - Metrics
 
