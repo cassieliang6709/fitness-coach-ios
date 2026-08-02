@@ -9,6 +9,7 @@ enum Route: Hashable {
     case strength
     case cardio
     case review
+    case realtime
 
     var path: String {
         switch self {
@@ -18,6 +19,7 @@ enum Route: Hashable {
         case .strength: return "/workout/strength"
         case .cardio: return "/workout/cardio"
         case .review: return "/workout/review"
+        case .realtime: return "/workout/realtime"
         }
     }
 
@@ -26,7 +28,7 @@ enum Route: Hashable {
         self = match
     }
 
-    static let all: [Route] = [.home, .plans, .legDay, .strength, .cardio, .review]
+    static let all: [Route] = [.home, .plans, .legDay, .strength, .cardio, .review, .realtime]
 }
 
 struct RootView: View {
@@ -61,6 +63,8 @@ struct RootView: View {
                         CardioCoachView(path: $path)
                     case .review:
                         ReviewView(path: $path)
+                    case .realtime:
+                        RealtimeCoachView(path: $path)
                     }
                 }
         }
