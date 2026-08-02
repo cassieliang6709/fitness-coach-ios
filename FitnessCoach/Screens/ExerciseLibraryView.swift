@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// A 50-movement source of truth. Safety filtering happens before search and
-/// display, so an exercise that conflicts with the saved profile cannot leak
-/// back in through a filter or query.
+/// The full server catalogue when connected, with the hand-curated 50 movement
+/// set retained as an offline fallback.
 struct ExerciseLibraryView: View {
+    @Environment(WorkoutSession.self) private var session
     @Environment(\.workoutStore) private var store
     @Binding var path: [Route]
 
@@ -22,6 +22,25 @@ struct ExerciseLibraryView: View {
 
     private var hiddenCount: Int {
         ExerciseCatalog.all.count - safeExercises.count
+    }
+
+    private var usesServerCatalog: Bool {
+        !session.exerciseCatalog.isEmpty
+    }
+
+    private var filteredServerExercises: [ExerciseCatalogItem] {
+        session.exerciseCatalog.filter { exercise in
+            let matchesMuscle =
+                selectedMuscle.map { exercise.muscleGroups.contains($0) } ?? true
+            let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let matchesSearch =
+                query.isEmpty
+                || exercise.displayName.localizedCaseInsensitiveContains(query)
+                || exercise.englishName.localizedCaseInsensitiveContains(query)
+                || exercise.muscleLabel.localizedCaseInsensitiveContains(query)
+                || exercise.equipmentLabel.localizedCaseInsensitiveContains(query)
+            return matchesMuscle && matchesSearch
+        }
     }
 
     private var filteredExercises: [ExerciseDefinition] {
@@ -47,32 +66,60 @@ struct ExerciseLibraryView: View {
         MobileAppShell {
             PageHeader(
                 title: "动作库",
-                subtitle: "\(safeExercises.count) 个适合你 · 完整库 50 个",
+                subtitle: usesServerCatalog
+                    ? "已连接完整库 · \(session.exerciseCatalog.count) 个动作"
+                    : "离线精选 · \(safeExercises.count) / 50 个适合当前设置",
                 style: .large,
                 onBack: { path.removeLast() }
             ) {
-                AnimatedMascot(pose: .dumbbell, size: 76)
+                RiveMascot(pose: .dumbbell, size: 76)
             }
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Theme.cardSpacing) {
                     safetySummary
+                    #if DEBUG
+                    riveLabTeaser
+                    #endif
                     searchField
-                    levelFilters
+                    if !usesServerCatalog {
+                        levelFilters
+                    }
                     muscleFilters
 
                     HStack(alignment: .firstTextBaseline) {
-                        Text("可用动作")
+                        Text(usesServerCatalog ? "全部动作" : "可用动作")
                             .font(Theme.cardTitle)
                             .foregroundStyle(Theme.mainText)
                         Spacer()
-                        Text("\(filteredExercises.count) 个")
-                            .font(Theme.caption)
-                            .foregroundStyle(Theme.secondaryText)
+                        Text(
+                            "\(usesServerCatalog ? filteredServerExercises.count : filteredExercises.count) 个"
+                        )
+                        .font(Theme.caption)
+                        .foregroundStyle(Theme.secondaryText)
                     }
                     .padding(.top, 2)
 
-                    if filteredExercises.isEmpty {
+                    if session.isCatalogLoading && !usesServerCatalog {
+                        ProgressView("正在连接完整动作库…")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 36)
+                    } else if usesServerCatalog && filteredServerExercises.isEmpty {
+                        emptyState
+                    } else if usesServerCatalog {
+                        ForEach(filteredServerExercises) { exercise in
+                            ServerExerciseLibraryCard(
+                                exercise: exercise,
+                                expanded: expandedExerciseID == exercise.id,
+                                onToggle: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        expandedExerciseID =
+                                            expandedExerciseID == exercise.id ? nil : exercise.id
+                                    }
+                                }
+                            )
+                        }
+                    } else if filteredExercises.isEmpty {
                         emptyState
                     } else {
                         ForEach(filteredExercises) { exercise in
@@ -95,12 +142,47 @@ struct ExerciseLibraryView: View {
         }
     }
 
+    #if DEBUG
+    private var riveLabTeaser: some View {
+        Button {
+            path.append(.riveLab)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "figure.strengthtraining.traditional")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Theme.primary)
+                    .frame(width: 42, height: 42)
+                    .background(Circle().fill(Theme.lightOrange))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Rive 动作状态机实验")
+                        .font(Theme.bodyStrong)
+                        .foregroundStyle(Theme.mainText)
+                    Text("切换 Beginner / Intermediate / Expert")
+                        .font(Theme.caption)
+                        .foregroundStyle(Theme.secondaryText)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.secondaryText)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .card()
+        .accessibilityIdentifier("rive-lab-entry")
+    }
+    #endif
+
     private var safetySummary: some View {
         HStack(alignment: .center, spacing: 12) {
             Mascot(pose: .point, size: 54)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("已经替你筛过一遍")
+                Text(usesServerCatalog ? "完整动作库已连接" : "已经替你筛过一遍")
                     .font(Theme.bodyStrong)
                     .foregroundStyle(Theme.mainText)
 
@@ -119,6 +201,9 @@ struct ExerciseLibraryView: View {
     }
 
     private var safetySummaryText: String {
+        if usesServerCatalog {
+            return "计划生成会按你已确认的器械筛选；浏览完整目录不代表医疗安全推荐。"
+        }
         let venue = "当前场地：\(profile.venue.label)"
         guard hiddenCount > 0 else { return "\(venue)。当前没有需要隐藏的动作。" }
 
@@ -208,6 +293,85 @@ struct ExerciseLibraryView: View {
 
 // MARK: - Entry card
 
+private struct ServerExerciseLibraryCard: View {
+    let exercise: ExerciseCatalogItem
+    let expanded: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .center, spacing: 12) {
+                    Mascot(pose: .dumbbell, size: 62)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(exercise.displayName)
+                            .font(Theme.cardTitle)
+                            .foregroundStyle(Theme.mainText)
+
+                        if !exercise.englishName.isEmpty {
+                            Text(exercise.englishName)
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.secondaryText)
+                        }
+
+                        Text(exercise.muscleLabel)
+                            .font(Theme.caption)
+                            .foregroundStyle(Theme.primary)
+                    }
+
+                    Spacer(minLength: 4)
+
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.secondaryText)
+                }
+
+                HStack(spacing: 12) {
+                    MetadataLabel(symbol: "number", text: "动作 ID \(exercise.id)")
+                    MetadataLabel(symbol: "dumbbell", text: exercise.equipmentLabel)
+                }
+
+                if expanded {
+                    Divider().overlay(Theme.border)
+
+                    if exercise.steps.isEmpty {
+                        Text("这条动作暂时没有分步说明，训练前请确认动作姿势。")
+                            .font(Theme.caption)
+                            .foregroundStyle(Theme.secondaryText)
+                    } else {
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text("动作要点")
+                                .font(Theme.bodyStrong)
+                                .foregroundStyle(Theme.mainText)
+
+                            ForEach(Array(exercise.steps.enumerated()), id: \.offset) {
+                                index, tip in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("\(index + 1)")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(Theme.primary)
+                                        .frame(width: 18, height: 18)
+                                        .background(Circle().fill(Theme.lightOrange))
+
+                                    Text(tip)
+                                        .font(Theme.body)
+                                        .foregroundStyle(Theme.mainText)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .card(selected: expanded)
+        .accessibilityHint(expanded ? "轻点收起动作要点" : "轻点查看动作要点")
+    }
+}
+
 private struct ExerciseLibraryCard: View {
     let exercise: ExerciseDefinition
     let expanded: Bool
@@ -217,7 +381,7 @@ private struct ExerciseLibraryCard: View {
         Button(action: onToggle) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .center, spacing: 12) {
-                    Mascot(pose: exercise.mascotPose, size: 62)
+                    ExerciseArtwork(exercise: exercise, size: 76)
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
@@ -359,7 +523,12 @@ private extension ExerciseLevel {
 // MARK: - Library entry point
 
 struct ExerciseLibraryTeaser: View {
+    @Environment(WorkoutSession.self) private var session
     let action: () -> Void
+
+    private var count: Int {
+        session.exerciseCatalog.isEmpty ? ExerciseCatalog.all.count : session.exerciseCatalog.count
+    }
 
     var body: some View {
         Button(action: action) {
@@ -367,13 +536,17 @@ struct ExerciseLibraryTeaser: View {
                 Mascot(pose: .stretch, size: 72)
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("50 个动作库")
+                    Text("\(count) 个动作库")
                         .font(Theme.cardTitle)
                         .foregroundStyle(Theme.mainText)
-                    Text("按部位、等级和身体状态安全筛选")
-                        .font(Theme.caption)
-                        .foregroundStyle(Theme.secondaryText)
-                        .multilineTextAlignment(.leading)
+                    Text(
+                        session.exerciseCatalog.isEmpty
+                            ? "离线精选，按部位、等级和身体状态筛选"
+                            : "与 AI 计划同一套完整动作数据"
+                    )
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                    .multilineTextAlignment(.leading)
                 }
 
                 Spacer(minLength: 6)
@@ -386,6 +559,6 @@ struct ExerciseLibraryTeaser: View {
         }
         .buttonStyle(.plain)
         .card(filled: Theme.lightOrange.opacity(0.45))
-        .accessibilityLabel("打开 50 个动作库")
+        .accessibilityLabel("打开 \(count) 个动作库")
     }
 }

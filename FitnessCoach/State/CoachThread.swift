@@ -20,9 +20,16 @@ final class CoachThread {
     var contextProvider: (@MainActor () -> CoachContext)?
     /// Active memory chips, sent so the coach knows the user's history.
     var memoryProvider: (@MainActor () -> [String])?
+    /// Finished workout summaries. Kept separate from long-term memories so
+    /// the model never has to invent an answer about the user's last session.
+    var historyProvider: (@MainActor () -> [String])?
     /// Executes a coach action against session state and returns the tool
     /// result string the model sees next turn.
     var actionHandler: (@MainActor (CoachAction) -> String)?
+    /// Receives a plan the Worker composed and stored. Unlike `actionHandler`
+    /// this returns nothing — the plan was already applied server-side, so
+    /// there is no tool result the model is waiting on.
+    var planHandler: (@MainActor (PlanWire) -> Void)?
 
     /// Real dictation. Nil (simulator, UI tests, denied permission) falls back
     /// to the scripted turns so the flow is always walkable.
@@ -36,6 +43,7 @@ final class CoachThread {
     private var usedTurns: Set<String> = []
     private var work: Task<Void, Never>?
     private let onEffect: (TurnEffect) -> Void
+    private let speaker = CoachSpeechPlayer()
 
     /// API-shaped history. Separate from `messages` because Claude needs the
     /// tool_use / tool_result blocks that never render as bubbles.
@@ -174,6 +182,7 @@ final class CoachThread {
             return
         }
         speech?.cancel()
+        speaker.stop()
         work?.cancel()
         work = nil
         voiceState = .idle
@@ -196,8 +205,17 @@ final class CoachThread {
 
         let turn = consumeTurn(matching: trimmed)
         apply(turn?.effect)
+        let replies =
+            turn?.replies
+            ?? [
+                CoachLine(
+                    core: script.isEmpty
+                        ? "教练服务尚未配置，暂时不能生成真实回复。"
+                        : "收到。按当前配置继续。"
+                )
+            ]
         work = Task {
-            await deliver(turn?.replies ?? [CoachLine(core: "收到。按当前配置继续。")])
+            await deliver(replies)
             finishWork()
         }
     }
@@ -219,11 +237,13 @@ final class CoachThread {
         var toolUses: [WireBlock] = []
         var toolResults: [WireBlock] = []
         var refused = false
+        var generatedPlanTitle: String?
 
         let request = CoachTurnRequest(
             style: style.rawValue,
             state: context,
             memories: memoryProvider?() ?? [],
+            history: historyProvider?() ?? [],
             messages: wire
         )
 
@@ -249,6 +269,15 @@ final class CoachThread {
                 case .refusal:
                     refused = true
 
+                case .plan(let wire):
+                    // Executed server-side, so there is no tool result to send
+                    // back — the Worker already validated and stored it.
+                    planHandler?(wire)
+                    generatedPlanTitle = wire.title
+
+                case .planError(let reason):
+                    append(.init(role: .assistant, content: "这份计划没排成：\(reason)"))
+
                 case .done:
                     break
                 }
@@ -258,16 +287,30 @@ final class CoachThread {
             lastError = (error as? LocalizedError)?.errorDescription ?? "连接教练失败"
             // Drop the unanswered user turn so the next attempt isn't malformed.
             if wire.last?.role == "user" { wire.removeLast() }
-            append(.init(role: .assistant, content: "网络不稳,先按当前配置继续。"))
+            let fallback = "网络不稳,先按当前配置继续。"
+            append(.init(role: .assistant, content: fallback))
+            await speak(fallback)
             return
         }
 
         isTyping = false
 
         if refused {
-            append(.init(role: .assistant, content: "这个问题我不方便回答。如果有伤病顾虑,请咨询医生。"))
+            let fallback = "这个问题我不方便回答。如果有伤病顾虑,请咨询医生。"
+            append(.init(role: .assistant, content: fallback))
             if wire.last?.role == "user" { wire.removeLast() }
+            await speak(fallback)
             return
+        }
+
+        // A plan-only tool turn may contain no text blocks at all. Without a
+        // local confirmation, the plan is applied successfully but the user
+        // sees a silent conversation and has no route into the result.
+        if let generatedPlanTitle {
+            let confirmation =
+                "计划已生成：\(generatedPlanTitle)。可以直接查看动作、训练部位和安排原因。"
+            append(.init(role: .assistant, content: confirmation))
+            streamed = [streamed, confirmation].filter { !$0.isEmpty }.joined(separator: " ")
         }
 
         // Record what the assistant actually said, including tool calls.
@@ -279,17 +322,21 @@ final class CoachThread {
 
         // Every tool_use must be answered before the next user turn, so close
         // the loop immediately. One hop only — the coach shouldn't chain tools.
-        guard !toolResults.isEmpty, depth == 0 else { return }
+        guard !toolResults.isEmpty, depth == 0 else {
+            await speak(streamed)
+            return
+        }
         wire.append(WireMessage(role: "user", content: toolResults))
         // Reuse the pre-tool snapshot: re-reading state here would show the
         // change the tools just made, and the coach would contradict itself
         // ("changed it to 10 kg" → "no need, you're already at 10 kg").
-        await continueAfterTools(context: context)
+        let followup = await continueAfterTools(context: context)
+        await speak([streamed, followup].filter { !$0.isEmpty }.joined(separator: " "))
     }
 
     /// Second leg of a tool turn: the tool results are already queued in `wire`.
-    private func continueAfterTools(context: CoachContext) async {
-        guard let api else { return }
+    private func continueAfterTools(context: CoachContext) async -> String {
+        guard let api else { return "" }
         isTyping = true
 
         var streamed = ""
@@ -299,6 +346,7 @@ final class CoachThread {
             style: style.rawValue,
             state: context,
             memories: memoryProvider?() ?? [],
+            history: historyProvider?() ?? [],
             messages: wire
         )
 
@@ -324,6 +372,7 @@ final class CoachThread {
         if !streamed.isEmpty {
             wire.append(WireMessage(role: "assistant", content: [.text(streamed)]))
         }
+        return streamed
     }
 
     private func update(id: String, content: String) {
@@ -365,8 +414,29 @@ final class CoachThread {
                 return
             }
             isTyping = false
-            append(.init(role: .assistant, content: line.rendered(for: style)))
+            let rendered = line.rendered(for: style)
+            append(.init(role: .assistant, content: rendered))
+            await speak(rendered)
             try? await Task.sleep(for: .seconds(0.25))
+        }
+    }
+
+    /// TTS is best-effort: a speech outage must never erase or fail a text
+    /// reply the user already received. Cancelling the turn stops playback.
+    private func speak(_ text: String) async {
+        guard let api, !text.isEmpty, !Task.isCancelled else { return }
+
+        voiceState = .processing
+        defer { voiceState = .idle }
+        do {
+            let audio = try await api.synthesizeSpeech(text)
+            guard !Task.isCancelled else { return }
+            voiceState = .speaking
+            try await speaker.play(audio)
+        } catch is CancellationError {
+            speaker.stop()
+        } catch {
+            lastError = (error as? LocalizedError)?.errorDescription ?? "语音播放失败"
         }
     }
 

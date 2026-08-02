@@ -23,3 +23,20 @@ struct AnimatedMascot: View {
             }
     }
 }
+
+/// Production seam for the future rigged character. Drop `mascot.riv` into
+/// Resources and give its default state machine a numeric `Action` input. The
+/// value is the zero-based order of `MascotPose`. Until then, the reviewed PNG
+/// artwork remains the safe fallback.
+struct RiveMascot: View {
+    let pose: MascotPose
+    var size: CGFloat
+
+    var body: some View {
+        if Bundle.main.url(forResource: "mascot", withExtension: "riv") != nil {
+            LocalRiveMascot(pose: pose, size: size)
+        } else {
+            AnimatedMascot(pose: pose, size: size)
+        }
+    }
+}

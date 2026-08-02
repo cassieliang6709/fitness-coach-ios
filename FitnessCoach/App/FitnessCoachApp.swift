@@ -10,10 +10,14 @@ struct FitnessCoachApp: App {
     @State private var session: WorkoutSession
 
     init() {
-        // UI tests get a throwaway store so they never touch real training data.
+        // Every explicit demo entry gets a throwaway store. In particular,
+        // debug deep links must not seed the user's persistent database with
+        // the sample profile and memories.
         let arguments = ProcessInfo.processInfo.arguments
-        let isUITest = arguments.contains("-uitest")
-        let container = WorkoutStore.makeContainer(inMemory: isUITest)
+        let usesDemoStore =
+            arguments.contains("-uitest") || arguments.contains("-onboarded")
+            || arguments.contains("-route")
+        let container = WorkoutStore.makeContainer(inMemory: usesDemoStore)
         let store = WorkoutStore(context: container.mainContext)
 
         // A genuine first launch goes through the welcome flow, which is what

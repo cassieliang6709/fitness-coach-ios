@@ -19,6 +19,55 @@ export interface ExerciseRow {
     target: string;
 }
 
+export interface ExerciseCatalogItem extends ExerciseRow {
+    secondary: string[];
+    steps: string[];
+}
+
+/**
+ * The complete movement catalogue, paged so the app can load all rows without
+ * asking D1 or the network to produce one oversized response.
+ */
+export async function exerciseCatalogPage(
+    env: Env,
+    limit: number,
+    offset: number
+): Promise<{ items: ExerciseCatalogItem[]; total: number; nextOffset: number | null }> {
+    const [count, rows] = await Promise.all([
+        env.DB.prepare(`SELECT COUNT(*) AS total FROM exercises`).first<{ total: number }>(),
+        env.DB.prepare(
+            `SELECT id, name, name_zh, body_part, equipment, target, secondary, steps_zh
+             FROM exercises
+             ORDER BY id
+             LIMIT ? OFFSET ?`
+        )
+            .bind(limit, offset)
+            .all(),
+    ]);
+
+    const total = Number(count?.total ?? 0);
+    const items = (rows.results ?? []).map((row) => {
+        const r = row as Record<string, unknown>;
+        return {
+            id: r.id as string,
+            name: r.name as string,
+            name_zh: (r.name_zh as string | null) ?? null,
+            body_part: r.body_part as string,
+            equipment: r.equipment as string,
+            target: r.target as string,
+            secondary: safeParse(r.secondary as string | null),
+            steps: safeParse(r.steps_zh as string | null),
+        };
+    });
+    const consumed = offset + items.length;
+
+    return {
+        items,
+        total,
+        nextOffset: consumed < total ? consumed : null,
+    };
+}
+
 /** Chinese gym vocabulary → the dataset's English `equipment` values. */
 const EQUIPMENT_ALIASES: Record<string, string> = {
     哑铃: "dumbbell",

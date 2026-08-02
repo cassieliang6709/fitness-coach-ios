@@ -41,6 +41,16 @@ final class WorkoutFlowUITests: XCTestCase {
 
     // MARK: - Exercise library
 
+    func testRiveLabSwitchesTheCharacterStateMachineInput() {
+        let app = launch(route: "/rive-lab")
+
+        XCTAssertTrue(app.staticTexts["Rive 动作实验"].waitForExistence(timeout: 6))
+        XCTAssertTrue(app.staticTexts["当前状态：Beginner"].exists)
+
+        app.buttons["rive-level-expert"].tap()
+        XCTAssertTrue(app.staticTexts["当前状态：Expert"].waitForExistence(timeout: 3))
+    }
+
     func testExerciseLibraryFiltersKneeContraindicationsBeforeSearch() {
         let app = launch(route: "/exercises")
 
@@ -58,6 +68,23 @@ final class WorkoutFlowUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["高脚杯深蹲"].exists)
     }
 
+    func testExerciseLibraryUsesExerciseSpecificArtwork() {
+        let app = launch(route: "/exercises")
+
+        let search = app.textFields["搜索动作、部位或器械"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.tap()
+        search.typeText("臀桥")
+
+        XCTAssertTrue(app.staticTexts["臀桥"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.images["exercise-specific-artwork-glute-bridge"].exists)
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "exercise-library-glute-bridge-artwork"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     // MARK: - Welcome
 
     /// A new user answers four questions, and every answer is a memory chip on
@@ -73,6 +100,7 @@ final class WorkoutFlowUITests: XCTestCase {
         app.buttons["继续"].tap()
 
         XCTAssertTrue(app.staticTexts["平时在哪训练？"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["拍下你常用的器械"].exists)
         app.buttons["option-家里"].tap()
         app.buttons["继续"].tap()
 
@@ -150,6 +178,21 @@ final class WorkoutFlowUITests: XCTestCase {
 
         app.buttons["开始陪练"].tap()
         XCTAssertTrue(app.staticTexts["力量陪练"].waitForExistence(timeout: 3))
+    }
+
+    func testPlanExerciseOpensLibraryDetailAndReturnsToPlan() {
+        let app = launch(route: "/plans/leg-day")
+
+        XCTAssertTrue(app.staticTexts["已连接你的动作库"].waitForExistence(timeout: 5))
+        app.buttons["plan-exercise-goblet-squat"].waitAndTap()
+
+        XCTAssertTrue(app.staticTexts["高脚杯深蹲"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["大腿前侧 · 臀"].exists)
+        XCTAssertTrue(app.staticTexts["在今天的 AI 计划里"].exists)
+
+        app.buttons["返回"].waitAndTap()
+        XCTAssertTrue(app.staticTexts["练腿日计划"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["已连接你的动作库"].exists)
     }
 
     // MARK: - Voice UI states and the knee adjustment
@@ -315,7 +358,7 @@ final class WorkoutFlowUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 3))
         field.tap()
         field.typeText("开始")
-        app.keyboards.buttons["send"].firstMatch.tap()
+        app.buttons["workout-send-button"].waitAndTap()
 
         XCTAssertTrue(
             app.staticTexts["膝盖朝脚尖方向，髋部向后坐。"].waitForExistence(timeout: 8)

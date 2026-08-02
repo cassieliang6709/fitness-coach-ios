@@ -17,7 +17,10 @@
 import { activePlan, equipmentFromMemories, savePlan, shortlist, validatePlan } from "./plan";
 import type { Env as PlanEnv, PlanInput } from "./plan";
 
-const UPSTREAM = "wss://api.minimax.chat/ws/v1/realtime?model=abab6.5s-chat";
+// A Worker opens an outbound WebSocket with an HTTPS fetch plus Upgrade.
+// `wss://` is valid for a WebSocket client URL, but not for the Fetch API and
+// throws before Cloudflare can return a controlled gateway error.
+const UPSTREAM = "https://api.minimax.chat/ws/v1/realtime?model=abab6.5s-chat";
 
 export interface RealtimeEnv extends PlanEnv {
     MINIMAX_API_KEY: string;
@@ -95,14 +98,24 @@ export async function openRealtime(
         .map((r) => `${r.id} | ${r.name_zh ?? r.name} | ${r.body_part} | ${r.equipment}`)
         .join("\n");
 
-    const upstreamResponse = await fetch(UPSTREAM, {
-        headers: {
-            Upgrade: "websocket",
-            Authorization: `Bearer ${env.MINIMAX_API_KEY}`,
-        },
-    });
+    let upstreamResponse: Response;
+    try {
+        upstreamResponse = await fetch(UPSTREAM, {
+            headers: {
+                Upgrade: "websocket",
+                Authorization: `Bearer ${env.MINIMAX_API_KEY}`,
+            },
+        });
+    } catch (error) {
+        console.error(
+            "minimax realtime connection failed",
+            error instanceof Error ? error.message : "unknown"
+        );
+        return new Response("upstream connection failed", { status: 502 });
+    }
     const upstream = upstreamResponse.webSocket;
     if (!upstream) {
+        console.error("minimax realtime upgrade refused", upstreamResponse.status);
         return new Response("upstream refused websocket", { status: 502 });
     }
     upstream.accept();
@@ -133,7 +146,7 @@ export async function openRealtime(
                     : "关于这个用户暂无长期记忆。"),
             input_audio_format: "pcm16",
             output_audio_format: "pcm16",
-            input_audio_transcription: { model: "whisper-1" },
+            input_audio_transcription: { model: "asr-01" },
             tools: [planFunction(catalogue)],
             tool_choice: "auto",
         },

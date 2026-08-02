@@ -92,28 +92,36 @@ scripted turn instead of opening a real recogniser.
 
 ## Backend (`worker/`)
 
-Cloudflare Worker that proxies Claude. Exists because the Anthropic key cannot
-ship inside the app binary. Data stays local (SwiftData) — the Worker is
-stateless and stores nothing.
+Cloudflare Worker that proxies the model providers. Keys never ship inside the
+app binary. Training records stay local in SwiftData; the exercise catalogue
+and generated plans live in D1 so the same active plan survives a relaunch.
 
 ```bash
 cd worker && npm install && npx wrangler deploy
 ```
 
-Two secrets, set with `wrangler secret put` (never in `wrangler.jsonc`, which is
-public): `ANTHROPIC_API_KEY` and `APP_SHARED_SECRET`.
+For a new D1 database, apply `schema.sql`, `seed-exercises.sql`, and
+`seed-names.sql` before deploying the Worker.
+
+Four secrets, set with `wrangler secret put` (never in `wrangler.jsonc`, which
+is public): `ANTHROPIC_API_KEY`, `MINIMAX_API_KEY`, `KIMI_API_KEY`, and
+`APP_SHARED_SECRET`.
 
 | Route | Auth | Purpose |
 | --- | --- | --- |
-| `GET /health` | Bearer | Reports whether the Claude key is configured (never its value) |
+| `GET /health` | Bearer | Reports whether the Claude and MiniMax keys are configured (never their values) |
 | `POST /coach/turn` | Bearer | Streams a coaching turn as SSE |
+| `GET /plan?user=…` | Bearer | Returns that install's active generated plan |
+| `POST /plan?user=…` | Bearer | Validates and stores a catalogue-backed plan |
+| `POST /speech` | Bearer | Voices the coach's final text with MiniMax T2A |
 
 `/coach/turn` request body: `{ style, state, memories, messages }`. It streams
 back `text` (token deltas), `action` (tool calls the app applies to local
-state), `refusal`, `done`, and `error` events.
+state), `plan` / `plan_error`, `refusal`, `done`, and `error` events.
 
-Three tools are exposed to the model — `adjust_weight`, `swap_exercise`, and
-`remember`. The app executes them; the Worker never touches app state.
+The app executes `adjust_weight`, `swap_exercise`, and `remember` locally.
+`generate_plan` runs on the Worker because both validation and the catalogue
+live there; accepted plans are cached by the app for offline launches.
 
 ## Mascot artwork
 

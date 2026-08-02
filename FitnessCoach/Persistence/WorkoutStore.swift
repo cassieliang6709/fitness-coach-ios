@@ -199,6 +199,18 @@ final class WorkoutStore {
         return (try? context.fetch(descriptor)) ?? []
     }
 
+    /// Compact, factual context for questions such as "上次练得怎么样".
+    /// The coach gets only finished sessions; an empty store stays empty.
+    func recentSessionSummaries(limit: Int = 3) -> [String] {
+        recentSessions(limit: max(limit * 2, limit)).filter { !$0.isSamplePlan }.prefix(limit).map {
+            session in
+            let date = session.startedAt.formatted(
+                .dateTime.year().month(.defaultDigits).day(.defaultDigits))
+            return
+                "\(date)：\(session.planTitle)，\(session.durationMinutes) 分钟，完成度 \(session.completionPercent)%，实际完成 \(session.setLogs.count) 组"
+        }
+    }
+
     /// Deletes everything. Used by UI tests and the debug reset.
     func wipe() {
         try? context.delete(model: SetLogRecord.self)

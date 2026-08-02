@@ -129,8 +129,8 @@ struct ExerciseDefinition: Identifiable, Hashable {
     let contraindications: Set<BodyCondition>
     let mascotPose: MascotPose
 
-    /// Reserved for a future Rive/Lottie asset. The still mascot remains the
-    /// honest fallback until a biomechanically reviewed animation exists.
+    /// Exercise-specific artwork uses this stable name. The generic mascot
+    /// pose remains the fallback when a reviewed image has not been generated.
     var animationAssetName: String { "exercise-\(id)" }
 
     var muscleLabel: String {

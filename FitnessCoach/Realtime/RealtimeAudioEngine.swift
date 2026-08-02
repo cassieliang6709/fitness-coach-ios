@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import Speech
 
 /// Microphone capture and coach playback for the realtime session.
 ///
@@ -39,6 +40,9 @@ final class RealtimeAudioEngine {
         interleaved: true)!
 
     private var converter: AVAudioConverter?
+    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
+    private var transcriptionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var transcriptionTask: SFSpeechRecognitionTask?
     private var isRunning = false
     private var isCapturing = false
 
@@ -75,9 +79,14 @@ final class RealtimeAudioEngine {
         }
 
         // Must happen before the graph is built: toggling voice processing
-        // reconfigures the I/O unit and invalidates existing taps.
+        // reconfigures the I/O unit and invalidates existing taps. The
+        // simulator's voice-processing I/O can stop its engine after startup;
+        // it also cannot validate real echo cancellation, so keep the stable
+        // regular I/O path there and reserve voice processing for devices.
+        #if !targetEnvironment(simulator)
         try? engine.inputNode.setVoiceProcessingEnabled(true)
         try? engine.outputNode.setVoiceProcessingEnabled(true)
+        #endif
 
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: graphFormat)
@@ -94,6 +103,9 @@ final class RealtimeAudioEngine {
 
     func stop() {
         stopCapture()
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
+        transcriptionRequest = nil
         stopPlayback()
         player.stop()
         engine.stop()
@@ -107,9 +119,13 @@ final class RealtimeAudioEngine {
 
     // MARK: - Capture
 
-    /// Installs the mic tap. `onChunk` fires roughly every 100 ms with 24 kHz
-    /// PCM16 bytes, on an audio thread — do not touch UI state from it.
-    func startCapture(onChunk: @escaping (Data) -> Void) {
+    /// Installs one mic tap for both the MiniMax PCM stream and the user-visible
+    /// local transcript. This avoids two audio engines competing for the same
+    /// simulator/device input route.
+    func startCapture(
+        onChunk: @escaping (Data) -> Void,
+        onTranscript: @escaping (String, Bool) -> Void
+    ) throws {
         guard isRunning, !isCapturing else { return }
 
         let input = engine.inputNode
@@ -117,20 +133,59 @@ final class RealtimeAudioEngine {
         // A zero sample rate means the input hardware never came up (simulator
         // without a mic, or a route change mid-start). Bail rather than install
         // a tap that will trap in AVAudioConverter.
-        guard inputFormat.sampleRate > 0 else { return }
+        guard inputFormat.sampleRate > 0 else {
+            throw Failure.sessionUnavailable("麦克风输入格式不可用")
+        }
 
         converter = AVAudioConverter(from: inputFormat, to: wireFormat)
-        guard let converter else { return }
+        guard let converter else {
+            throw Failure.sessionUnavailable("无法创建 24 kHz 音频转换器")
+        }
+
+        transcriptionTask?.cancel()
+        let transcriptionRequest = SFSpeechAudioBufferRecognitionRequest()
+        transcriptionRequest.shouldReportPartialResults = true
+        if let speechRecognizer {
+            transcriptionRequest.requiresOnDeviceRecognition =
+                speechRecognizer.supportsOnDeviceRecognition
+        }
+        self.transcriptionRequest = transcriptionRequest
+        transcriptionTask = speechRecognizer?.recognitionTask(with: transcriptionRequest) {
+            result, error in
+            if let result {
+                onTranscript(result.bestTranscription.formattedString, result.isFinal)
+            } else if error != nil {
+                onTranscript("", true)
+            }
+        }
 
         // 100 ms of input audio per callback. The tap size is a hint — CoreAudio
         // rounds it — which is why the output capacity below is derived from the
         // buffer we actually receive.
         let tapSize = AVAudioFrameCount(inputFormat.sampleRate / 10)
         input.installTap(onBus: 0, bufferSize: tapSize, format: inputFormat) { buffer, _ in
+            transcriptionRequest.append(buffer)
             guard let chunk = Self.convert(buffer, with: converter, to: self.wireFormat) else {
                 return
             }
             onChunk(chunk)
+        }
+
+        // The simulator may stop an otherwise configured engine after an audio
+        // route reconfiguration. `isRunning` above tracks our graph lifecycle,
+        // while `engine.isRunning` is the source of truth for live I/O.
+        if !engine.isRunning {
+            engine.prepare()
+            do {
+                try engine.start()
+            } catch {
+                input.removeTap(onBus: 0)
+                self.converter = nil
+                throw Failure.sessionUnavailable(error.localizedDescription)
+            }
+        }
+        if !player.isPlaying {
+            player.play()
         }
         isCapturing = true
     }
@@ -138,6 +193,7 @@ final class RealtimeAudioEngine {
     func stopCapture() {
         guard isCapturing else { return }
         engine.inputNode.removeTap(onBus: 0)
+        transcriptionRequest?.endAudio()
         converter?.reset()
         converter = nil
         isCapturing = false
@@ -221,6 +277,8 @@ final class RealtimeAudioEngine {
         bufferLock.lock()
         scheduledBuffers = 0
         bufferLock.unlock()
-        player.play()
+        if engine.isRunning {
+            player.play()
+        }
     }
 }

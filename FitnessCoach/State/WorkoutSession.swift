@@ -12,7 +12,19 @@ final class WorkoutSession {
 
     // MARK: - Plan & preferences
 
-    let plan = MockData.legDayPlan
+    private(set) var plan = WorkoutPlan(id: "unavailable", title: "还没有可用计划")
+    /// True for a cached or server-backed plan. When the live service is
+    /// configured, the sample plan is never presented as the user's plan.
+    private(set) var hasGeneratedPlan = false
+    private(set) var isPlanLoading = false
+    private(set) var planError: String?
+    private(set) var exerciseCatalog: [ExerciseCatalogItem] = []
+    private(set) var isCatalogLoading = false
+    private(set) var catalogError: String?
+
+    var usesLivePlanService: Bool { api != nil }
+    var usesDemoData: Bool { isDemoMode }
+    var canStartWorkout: Bool { hasGeneratedPlan }
 
     var aiStyle: AIStyle = .practical {
         didSet {
@@ -69,7 +81,31 @@ final class WorkoutSession {
     // MARK: - Cardio progress
 
     private(set) var cardioSeconds = 0
-    let cardioTarget = MockData.cardioTargetMinutes
+    var cardioTarget: Int {
+        guard let duration = cardioSection?.duration,
+            let value = duration.split(whereSeparator: { !$0.isNumber }).compactMap({ Int($0) })
+                .first
+        else { return MockData.cardioTargetMinutes }
+        return min(120, max(5, value))
+    }
+
+    var cardioName: String { cardioExercise?.name ?? MockData.cardioName }
+
+    var cardioPrescription: String {
+        cardioExercise.map { "\($0.reps) · \($0.sets) 组" } ?? MockData.cardioPrescription
+    }
+
+    var trainingVenue: String {
+        store.profile()?.venue.label ?? MockData.strengthVenue
+    }
+
+    private var cardioExercise: Exercise? {
+        cardioSection?.exercises.first
+    }
+
+    private var cardioSection: PlanSection? {
+        plan.sections.first { $0.kind == .cardio }
+    }
 
     // MARK: - Memory outcomes
 
@@ -88,6 +124,8 @@ final class WorkoutSession {
     // MARK: - Persistence
 
     private let store: WorkoutStore
+    private let api: CoachAPI?
+    private let isDemoMode: Bool
     private var record: SessionRecord?
     private(set) var startedAt = Date.now
 
@@ -100,6 +138,15 @@ final class WorkoutSession {
 
     init(store: WorkoutStore) {
         self.store = store
+        self.isDemoMode = Self.usesDemoData
+        self.api = isDemoMode ? nil : Self.makeAPI()
+        if isDemoMode {
+            plan = MockData.legDayPlan
+            hasGeneratedPlan = true
+        } else if let cached = PlanCache.loadForToday(), let cachedPlan = cached.asPlan {
+            plan = cachedPlan
+            hasGeneratedPlan = true
+        }
         makeDailyThread()
         makeThreads()
         // After the threads exist: `aiStyle`'s observer fans out to all three.
@@ -108,14 +155,21 @@ final class WorkoutSession {
 
     /// Live coach when configured, nil in demo / UI-test mode.
     private static func makeAPI() -> CoachAPI? {
-        if ProcessInfo.processInfo.arguments.contains("-uitest") { return nil }
         return CoachAPI.fromBundle()
+    }
+
+    private static var usesDemoData: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        return arguments.contains("-uitest") || arguments.contains("-onboarded")
+            || arguments.contains("-route")
     }
 
     private func makeDailyThread() {
         daily = CoachThread(
-            opening: MockData.homeOpening,
-            script: MockData.homeScript,
+            opening: isDemoMode
+                ? MockData.homeOpening
+                : [CoachLine(core: "我会根据你的目标、场地和身体状态安排训练，记录只采用你实际完成的内容。")],
+            script: isDemoMode || api != nil ? MockData.homeScript : [],
             onEffect: { [weak self] effect in self?.handle(effect) }
         )
         // The home tab is read-and-type, not hands-busy — start on the keyboard.
@@ -137,12 +191,17 @@ final class WorkoutSession {
     private func makeThreads() {
         strength = CoachThread(
             opening: MockData.strengthOpening,
-            script: MockData.strengthScript,
+            script: isDemoMode ? MockData.strengthScript : [],
             onEffect: { [weak self] effect in self?.handle(effect) }
         )
         cardio = CoachThread(
-            opening: MockData.cardioOpening,
-            script: MockData.cardioScript,
+            opening: isDemoMode
+                ? MockData.cardioOpening
+                : [
+                    CoachLine(core: "现在进入有氧阶段。"),
+                    CoachLine(core: "按计划强度开始，有不适马上告诉我。"),
+                ],
+            script: isDemoMode ? MockData.cardioScript : [],
             onEffect: { [weak self] effect in self?.handle(effect) }
         )
         configure(strength, phase: "strength")
@@ -151,10 +210,13 @@ final class WorkoutSession {
 
     private func configure(_ thread: CoachThread, phase: String) {
         thread.style = aiStyle
-        thread.api = Self.makeAPI()
+        thread.api = api
         thread.speech = speech
         thread.memoryProvider = { [weak self] in
             self?.store.activeMemories().map(\.text) ?? []
+        }
+        thread.historyProvider = { [weak self] in
+            self?.store.recentSessionSummaries() ?? []
         }
         thread.contextProvider = { [weak self] in
             self?.coachContext(phase: phase)
@@ -163,23 +225,158 @@ final class WorkoutSession {
         thread.actionHandler = { [weak self] action in
             self?.perform(action) ?? "无法执行。"
         }
+        thread.planHandler = { [weak self] wire in
+            self?.receive(wire)
+        }
+    }
+
+    // MARK: - Generated plan
+
+    /// Pulls the active server plan. A first-time user gets one generated from
+    /// the onboarding memories when D1 has no plan yet.
+    func syncPlan(generateIfMissing: Bool) async {
+        guard phase == .planning, !isPlanLoading else { return }
+        guard let api else {
+            if !hasGeneratedPlan {
+                planError = "教练服务未配置，暂时无法生成真实计划。"
+            }
+            return
+        }
+        isPlanLoading = true
+        planError = nil
+        defer { isPlanLoading = false }
+
+        do {
+            if let wire = try await api.activePlan(), wire.wasCreatedToday {
+                guard receive(wire) else { throw PlanSyncError.invalidPlan }
+                return
+            }
+            if generateIfMissing, !hasGeneratedPlan {
+                try await generatePlan(using: api, replacingCurrent: false)
+            }
+        } catch {
+            planError = error.localizedDescription
+        }
+    }
+
+    /// Keeps browsing, plan labels and detail pages on the same D1 ids. The
+    /// curated local 50 remain available as an honest offline fallback.
+    func syncExerciseCatalog() async {
+        guard let api, !isCatalogLoading else { return }
+        isCatalogLoading = true
+        catalogError = nil
+        defer { isCatalogLoading = false }
+
+        do {
+            let items = try await api.exerciseCatalog()
+            guard !items.isEmpty else { throw PlanSyncError.invalidPlan }
+            exerciseCatalog = items
+        } catch {
+            catalogError = error.localizedDescription
+        }
+    }
+
+    func catalogExercise(id: String) -> ExerciseCatalogItem? {
+        exerciseCatalog.first { $0.id == id }
+    }
+
+    /// Asks the same Worker tool for a new plan; used by the plan library's
+    /// explicit "换一份" action.
+    func regeneratePlan() async {
+        guard let api, phase == .planning, !isPlanLoading else { return }
+        isPlanLoading = true
+        planError = nil
+        defer { isPlanLoading = false }
+
+        do {
+            try await generatePlan(using: api, replacingCurrent: true)
+        } catch {
+            planError = error.localizedDescription
+        }
+    }
+
+    private func generatePlan(using api: CoachAPI, replacingCurrent: Bool) async throws {
+        let profile = store.profile()
+        let prompt =
+            replacingCurrent
+            ? "请根据我的目标、场地和身体状况，直接换一份不同的今日训练计划。"
+            : "请根据我的目标、场地和身体状况，直接生成今天的训练计划。"
+        let context = CoachContext(
+            phase: "planning",
+            exercise: hasGeneratedPlan ? plan.title : "尚未生成计划",
+            prescription: profile?.summary ?? "按用户记忆生成",
+            venue: profile?.venue.label
+        )
+        let request = CoachTurnRequest(
+            style: aiStyle.rawValue,
+            state: context,
+            memories: store.activeMemories().map(\.text),
+            history: store.recentSessionSummaries(),
+            messages: [.user(prompt)]
+        )
+
+        var received = false
+        for try await event in api.stream(request) {
+            switch event {
+            case .plan(let wire):
+                received = receive(wire)
+            case .planError(let reason):
+                throw PlanSyncError.rejected(reason)
+            default:
+                break
+            }
+        }
+        guard received else { throw PlanSyncError.missingPlan }
+    }
+
+    @discardableResult
+    private func receive(_ wire: PlanWire, refreshIfNeeded: Bool = true) -> Bool {
+        guard let generated = wire.asPlan else {
+            planError = PlanSyncError.invalidPlan.localizedDescription
+            return false
+        }
+
+        PlanCache.save(wire)
+        // Keep an in-progress session stable. The new plan becomes active on
+        // reset, while the Worker and cache already treat it as the latest.
+        guard phase == .planning else { return true }
+        plan = generated
+        hasGeneratedPlan = true
+        planError = nil
+
+        // The plan SSE is intentionally compact. Fetch the persisted version
+        // once so body part, equipment and coaching steps arrive in the iOS
+        // result widget and detail page as well.
+        if refreshIfNeeded,
+            wire.items.contains(where: { $0.bodyPart == nil }),
+            let api
+        {
+            Task { [weak self] in
+                guard let enriched = try? await api.activePlan() else { return }
+                _ = self?.receive(enriched, refreshIfNeeded: false)
+            }
+        }
+        return true
     }
 
     /// Snapshot of what the user is doing right now, sent with every turn.
     private func coachContext(phase: String) -> CoachContext {
         if phase == "planning" {
+            let waitingForPlan = api != nil && !hasGeneratedPlan
             return CoachContext(
                 phase: "planning",
-                exercise: plan.title,
-                prescription: plan.tags.joined(separator: " · "),
-                venue: MockData.strengthVenue
+                exercise: waitingForPlan ? "尚未生成计划" : plan.title,
+                prescription: waitingForPlan
+                    ? (store.profile()?.summary ?? "按用户记忆生成")
+                    : plan.tags.joined(separator: " · "),
+                venue: trainingVenue
             )
         }
         if phase == "cardio" {
             return CoachContext(
                 phase: "cardio",
-                exercise: MockData.cardioName,
-                prescription: MockData.cardioPrescription,
+                exercise: cardioName,
+                prescription: cardioPrescription,
                 elapsedMinutes: cardioElapsedMinutes,
                 targetMinutes: cardioTarget
             )
@@ -190,7 +387,7 @@ final class WorkoutSession {
             prescription: strengthMetrics,
             setNumber: currentSet,
             totalSets: currentExercise.sets,
-            venue: MockData.strengthVenue
+            venue: trainingVenue
         )
     }
 
@@ -291,7 +488,7 @@ final class WorkoutSession {
     var cardioOutcome: ExerciseOutcome {
         ExerciseOutcome(
             id: "cardio",
-            name: MockData.cardioName,
+            name: cardioName,
             doneSets: cardioElapsedMinutes,
             plannedSets: cardioTarget,
             reps: "",
@@ -304,6 +501,7 @@ final class WorkoutSession {
     // MARK: - Strength flow
 
     func enterStrength() {
+        guard canStartWorkout else { return }
         if phase == .planning {
             phase = .strengthActive
             startedAt = .now
@@ -485,6 +683,10 @@ final class WorkoutSession {
         adjustmentCount = 0
         record = nil
         startedAt = .now
+        if let cached = PlanCache.loadForToday(), let cachedPlan = cached.asPlan {
+            plan = cachedPlan
+            hasGeneratedPlan = true
+        }
         makeThreads()
     }
 
@@ -500,6 +702,20 @@ final class WorkoutSession {
         case .flattenIncline:
             // A machine setting, not a plan rewrite.
             kneeReported = true
+        }
+    }
+}
+
+private enum PlanSyncError: LocalizedError {
+    case invalidPlan
+    case missingPlan
+    case rejected(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidPlan: return "计划缺少可执行的力量动作"
+        case .missingPlan: return "AI 没有返回可用计划，请重试"
+        case .rejected(let reason): return "计划没有通过校验：\(reason)"
         }
     }
 }

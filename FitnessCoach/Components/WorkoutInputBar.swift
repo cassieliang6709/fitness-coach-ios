@@ -99,6 +99,7 @@ struct WorkoutInputBar: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("workout-send-button")
                 .disabled(!canSend)
             }
             .padding(.horizontal, 12)

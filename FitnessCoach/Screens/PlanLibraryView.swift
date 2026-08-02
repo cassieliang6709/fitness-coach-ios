@@ -15,7 +15,11 @@ struct PlanLibraryView: View {
 
     var body: some View {
         MobileAppShell {
-            PageHeader(title: "训练计划库")
+            PageHeader(
+                title: "训练计划库",
+                style: .navBar,
+                onBack: { path.removeLast() }
+            )
 
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.cardSpacing) {
@@ -26,10 +30,18 @@ struct PlanLibraryView: View {
                         path.append(.exerciseLibrary)
                     }
 
-                    PlanCard(plan: session.plan, featured: true, selected: true)
-
-                    ForEach(MockData.otherPlans) { plan in
-                        PlanCard(plan: plan)
+                    if session.canStartWorkout {
+                        PlanCard(plan: session.plan, featured: true, selected: true)
+                        if !session.usesLivePlanService {
+                            ForEach(MockData.otherPlans) { plan in
+                                PlanCard(plan: plan)
+                            }
+                        }
+                    } else {
+                        MemoryNoteCard(
+                            title: "还没有可用计划",
+                            message: session.planError ?? "根据你的目标和身体状态生成后，会显示在这里。"
+                        )
                     }
                 }
                 .padding(.horizontal, Theme.pagePadding)
@@ -37,8 +49,24 @@ struct PlanLibraryView: View {
             }
         } bottom: {
             BottomBar {
-                PrimaryButton(title: "查看计划") {
-                    path.append(.legDay)
+                if session.usesLivePlanService {
+                    PrimaryButton(
+                        title: session.isPlanLoading
+                            ? "正在生成…"
+                            : (session.canStartWorkout ? "让 AI 换一份" : "生成计划"),
+                        enabled: !session.isPlanLoading
+                    ) {
+                        Task { await session.regeneratePlan() }
+                    }
+                } else {
+                    PrimaryButton(
+                        title: session.canStartWorkout ? "查看计划" : "教练服务未配置",
+                        enabled: session.canStartWorkout
+                    ) {
+                        if session.canStartWorkout {
+                            path.append(.legDay)
+                        }
+                    }
                 }
             }
         }

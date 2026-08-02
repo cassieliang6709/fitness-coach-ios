@@ -31,6 +31,8 @@ export interface CoachRequest {
     /** Absent when the user is just chatting rather than mid-set. */
     state?: CoachState;
     memories: string[];
+    /** Finished sessions supplied by the app, newest first. */
+    history?: string[];
     messages: Anthropic.MessageParam[];
     /** Real rows from the exercise table; the only movements it may use. */
     shortlist?: ExerciseRow[];
@@ -173,7 +175,11 @@ function planTool(shortlist: ExerciseRow[]): Anthropic.ToolUnion {
 
 // MARK: - Message assembly
 
-function describeState(state: CoachState | undefined, memories: string[]): string {
+function describeState(
+    state: CoachState | undefined,
+    memories: string[],
+    history: string[] = []
+): string {
     const lines: string[] = [];
 
     if (!state) {
@@ -201,6 +207,11 @@ function describeState(state: CoachState | undefined, memories: string[]): strin
             ? `关于这个用户你已经记住的：\n${memories.map((m) => `- ${m}`).join("\n")}`
             : "关于这个用户暂无长期记忆。"
     );
+    lines.push(
+        history.length > 0
+            ? `最近真实训练记录（只能按这些记录回答历史问题）：\n${history.map((item) => `- ${item}`).join("\n")}`
+            : "暂无已完成的训练记录。用户问上次训练时，直接说明还没有记录，不要编造。"
+    );
 
     return lines.join("\n");
 }
@@ -222,7 +233,10 @@ function buildSystem(request: CoachRequest): Anthropic.TextBlockParam[] {
             // for when the prompt grows or the model changes.
             cache_control: { type: "ephemeral" },
         },
-        { type: "text", text: describeState(request.state, request.memories) },
+        {
+            type: "text",
+            text: describeState(request.state, request.memories, request.history),
+        },
     ];
 }
 

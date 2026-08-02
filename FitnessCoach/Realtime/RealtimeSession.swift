@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import Observation
+import Speech
 
 /// Live voice conversation with MiniMax Realtime, through the Coach Gateway.
 ///
@@ -69,6 +70,7 @@ final class RealtimeSession {
     private var pendingChunks = 0
     private var turnStartedAt: Date?
     private var speechStartedAt: Date?
+    private var localTranscriptMessageId: UUID?
 
     /// Below this a "hold to talk" press is a mis-tap, not speech. Matches the
     /// handoff's 550 ms minimum for the web VAD.
@@ -101,6 +103,10 @@ final class RealtimeSession {
         Task {
             guard await requestMicrophoneAccess() else {
                 status = .failed("麦克风权限未开启")
+                return
+            }
+            guard await requestSpeechRecognitionAccess() else {
+                status = .failed("语音识别权限未开启")
                 return
             }
 
@@ -142,6 +148,7 @@ final class RealtimeSession {
         audio.stop()
         pendingChunks = 0
         speechStartedAt = nil
+        closeOpenUserTranscript()
     }
 
     /// A failed upstream turn cannot be resumed — MiniMax rejects further
@@ -191,17 +198,31 @@ final class RealtimeSession {
 
         pendingChunks = 0
         speechStartedAt = .now
-        send(RealtimeWire.audioClear)
-        send(RealtimeWire.vad(stage: "enabled"))
+        closeOpenUserTranscript()
+        localTranscriptMessageId = nil
         status = .listening
 
-        audio.startCapture { [weak self] chunk in
-            // Hops off the audio thread; at ~10 chunks a second the main-actor
-            // round trip is not worth a dedicated queue.
-            Task { @MainActor [weak self] in
-                self?.appendAudio(chunk)
-            }
+        do {
+            try audio.startCapture(
+                onChunk: { [weak self] chunk in
+                    // Hops off the audio thread; at ~10 chunks a second the main-actor
+                    // round trip is not worth a dedicated queue.
+                    Task { @MainActor [weak self] in
+                        self?.appendAudio(chunk)
+                    }
+                },
+                onTranscript: { [weak self] transcript, isFinal in
+                    Task { @MainActor [weak self] in
+                        self?.updateUserTranscript(transcript, isFinal: isFinal)
+                    }
+                })
+        } catch {
+            teardown()
+            status = .failed(error.localizedDescription)
+            return
         }
+        send(RealtimeWire.audioClear)
+        send(RealtimeWire.vad(stage: "enabled"))
     }
 
     func endSpeaking() {
@@ -240,6 +261,7 @@ final class RealtimeSession {
 
         audio.stopPlayback()
         closeOpenCoachMessage()
+        closeOpenUserTranscript()
         messages.append(RealtimeMessage(role: .user, text: trimmed, isComplete: true))
 
         send(RealtimeWire.userText(trimmed))
@@ -303,8 +325,7 @@ final class RealtimeSession {
         switch event.type {
         case "conversation.item.created":
             if let transcript = event.inputTranscript, !transcript.isEmpty {
-                messages.append(
-                    RealtimeMessage(role: .user, text: transcript, isComplete: true))
+                updateUserTranscript(transcript, isFinal: true)
             }
 
         case "response.text.delta", "response.audio_transcript.delta":
@@ -318,6 +339,7 @@ final class RealtimeSession {
             watchPlayback()
 
         case "response.done":
+            closeOpenUserTranscript()
             closeOpenCoachMessage()
             // Audio keeps playing after the model is done generating, so the
             // status only drops back to ready once the queue drains.
@@ -346,6 +368,32 @@ final class RealtimeSession {
     }
 
     // MARK: - Transcript
+
+    private func updateUserTranscript(_ transcript: String, isFinal: Bool) {
+        let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            if isFinal { closeOpenUserTranscript() }
+            return
+        }
+
+        if let id = localTranscriptMessageId,
+            let index = messages.firstIndex(where: { $0.id == id })
+        {
+            messages[index].text = text
+            messages[index].isComplete = isFinal
+        } else {
+            let message = RealtimeMessage(role: .user, text: text, isComplete: isFinal)
+            localTranscriptMessageId = message.id
+            messages.append(message)
+        }
+    }
+
+    private func closeOpenUserTranscript() {
+        guard let id = localTranscriptMessageId,
+            let index = messages.firstIndex(where: { $0.id == id })
+        else { return }
+        messages[index].isComplete = true
+    }
 
     private func appendCoachText(_ delta: String) {
         guard !delta.isEmpty else { return }
@@ -393,6 +441,15 @@ final class RealtimeSession {
     private func requestMicrophoneAccess() async -> Bool {
         if AVAudioApplication.shared.recordPermission == .granted { return true }
         return await AVAudioApplication.requestRecordPermission()
+    }
+
+    private func requestSpeechRecognitionAccess() async -> Bool {
+        if SFSpeechRecognizer.authorizationStatus() == .authorized { return true }
+        return await withCheckedContinuation { continuation in
+            SFSpeechRecognizer.requestAuthorization { status in
+                continuation.resume(returning: status == .authorized)
+            }
+        }
     }
 
     /// `REALTIME_GATEWAY_HOST` comes from `Secrets.xcconfig` via Info.plist and

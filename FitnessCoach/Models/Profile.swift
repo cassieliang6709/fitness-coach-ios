@@ -140,6 +140,7 @@ struct UserProfile: Hashable {
     var venue: TrainingVenue = .gym
     var conditions: [BodyCondition] = []
     var style: AIStyle = .practical
+    var equipment: [String] = []
 
     var weeklyTarget: Int { goal.weeklyTarget }
 
@@ -162,6 +163,13 @@ struct UserProfile: Hashable {
                 id: "mem-\(condition.rawValue)",
                 category: .injury,
                 text: condition.memoryText
+            )
+        }
+        seeds += equipment.map { name in
+            WorkoutMemory(
+                id: "mem-equipment-\(name)",
+                category: .equipment,
+                text: name
             )
         }
         return seeds

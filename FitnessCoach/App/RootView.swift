@@ -6,32 +6,41 @@ enum Route: Hashable {
     case home
     case plans
     case exerciseLibrary
+    case exerciseDetail(String)
     case legDay
     case strength
     case cardio
     case review
     case realtime
+    case riveLab
 
     var path: String {
         switch self {
         case .home: return "/home"
         case .plans: return "/plans"
         case .exerciseLibrary: return "/exercises"
+        case .exerciseDetail(let id): return "/exercises/\(id)"
         case .legDay: return "/plans/leg-day"
         case .strength: return "/workout/strength"
         case .cardio: return "/workout/cardio"
         case .review: return "/workout/review"
         case .realtime: return "/workout/realtime"
+        case .riveLab: return "/rive-lab"
         }
     }
 
     init?(path: String) {
+        if path.hasPrefix("/exercises/"), path.count > "/exercises/".count {
+            self = .exerciseDetail(String(path.dropFirst("/exercises/".count)))
+            return
+        }
         guard let match = Route.all.first(where: { $0.path == path }) else { return nil }
         self = match
     }
 
     static let all: [Route] = [
         .home, .plans, .exerciseLibrary, .legDay, .strength, .cardio, .review, .realtime,
+        .riveLab,
     ]
 }
 
@@ -61,6 +70,8 @@ struct RootView: View {
                         PlanLibraryView(path: $path)
                     case .exerciseLibrary:
                         ExerciseLibraryView(path: $path)
+                    case .exerciseDetail(let id):
+                        ExerciseDetailView(exerciseID: id, path: $path)
                     case .legDay:
                         LegDayDetailView(path: $path)
                     case .strength:
@@ -71,6 +82,8 @@ struct RootView: View {
                         ReviewView(path: $path)
                     case .realtime:
                         RealtimeCoachView(path: $path)
+                    case .riveLab:
+                        RiveLabView(path: $path)
                     }
                 }
         }
@@ -79,6 +92,13 @@ struct RootView: View {
         .tint(Theme.primary)
         .preferredColorScheme(.light)
         .onAppear(perform: applyLaunchRoute)
+        .task(id: onboarded) {
+            if onboarded {
+                async let plan: Void = session.syncPlan(generateIfMissing: true)
+                async let catalogue: Void = session.syncExerciseCatalog()
+                _ = await (plan, catalogue)
+            }
+        }
     }
 
     @ViewBuilder
@@ -106,12 +126,24 @@ struct RootView: View {
         #if DEBUG
         guard path.isEmpty,
             onboarded,
-            let raw = UserDefaults.standard.string(forKey: "route"),
+            let raw = requestedLaunchRoute,
             let route = Route(path: raw),
             route != .home
         else { return }
         path = [route]
         #endif
+    }
+
+    /// Explicit launch arguments must win over any route left in defaults by a
+    /// previous simulator run; UI tests rely on each launch being isolated.
+    private var requestedLaunchRoute: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-route"),
+            arguments.indices.contains(index + 1)
+        {
+            return arguments[index + 1]
+        }
+        return UserDefaults.standard.string(forKey: "route")
     }
 }
 

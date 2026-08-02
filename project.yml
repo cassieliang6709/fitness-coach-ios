@@ -6,12 +6,19 @@ options:
   createIntermediateGroups: true
   groupSortPosition: top
 
+packages:
+  RiveRuntime:
+    url: https://github.com/rive-app/rive-ios
+    exactVersion: 6.20.1
+
 targets:
   FitnessCoach:
     type: application
     platform: iOS
     sources:
       - path: FitnessCoach
+    dependencies:
+      - package: RiveRuntime
     info:
       path: FitnessCoach/Info.plist
       properties:
@@ -23,6 +30,7 @@ targets:
           - UIInterfaceOrientationPortrait
         UIUserInterfaceStyle: Light
         NSMicrophoneUsageDescription: 训练中用麦克风听你说话，把不适和反馈告诉教练。
+        NSCameraUsageDescription: 拍摄健身房环境，让教练识别你实际能用的器械。
         NSSpeechRecognitionUsageDescription: 把你说的话转成文字发给 AI 教练。识别在设备上完成。
         NSLocalNetworkUsageDescription: 连接你电脑上运行的教练网关，用于实时语音陪练的联调。
         # The realtime gateway runs on a dev machine over plain ws during

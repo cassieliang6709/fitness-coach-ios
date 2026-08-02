@@ -18,6 +18,11 @@ struct PageHeader<Trailing: View>: View {
             switch style {
             case .large:
                 HStack(alignment: .center) {
+                    if let onBack {
+                        IconButton(symbol: "chevron.left", action: onBack)
+                            .accessibilityLabel("返回")
+                    }
+
                     VStack(alignment: .leading, spacing: 4) {
                         Text(title)
                             .font(Theme.pageTitle)
@@ -46,6 +51,7 @@ struct PageHeader<Trailing: View>: View {
                     HStack {
                         if let onBack {
                             IconButton(symbol: "chevron.left", action: onBack)
+                                .accessibilityLabel("返回")
                         }
                         Spacer()
                         trailing

@@ -128,6 +128,10 @@ final class SessionRecord {
         return max(1, Int(end.timeIntervalSince(startedAt) / 60))
     }
 
+    /// Stable id of the bundled walkthrough plan. Records created from it are
+    /// useful in explicit demo mode, but must not count as real user history.
+    var isSamplePlan: Bool { planID == "leg-day" }
+
     /// Logged sets over planned sets — the same honest number the review shows.
     var completionPercent: Int {
         guard plannedSetCount > 0 else { return 0 }

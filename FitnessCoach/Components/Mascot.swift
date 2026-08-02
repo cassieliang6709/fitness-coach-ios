@@ -39,6 +39,27 @@ struct Mascot: View {
     }
 }
 
+/// Uses a reviewed exercise-specific illustration when available, while
+/// preserving the existing pose library as a complete fallback for the rest
+/// of the 50-movement catalog.
+struct ExerciseArtwork: View {
+    let exercise: ExerciseDefinition
+    var size: CGFloat
+
+    var body: some View {
+        if let artwork = UIImage(named: exercise.animationAssetName) {
+            Image(uiImage: artwork)
+                .resizable()
+                .scaledToFit()
+                .frame(width: size, height: size)
+                .accessibilityLabel("\(exercise.name)动作示意图")
+                .accessibilityIdentifier("exercise-specific-artwork-\(exercise.id)")
+        } else {
+            Mascot(pose: exercise.mascotPose, size: size)
+        }
+    }
+}
+
 // MARK: - Vector fallback
 
 /// Shape-only rendition of the same character: white body, orange cap,

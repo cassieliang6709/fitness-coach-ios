@@ -3,11 +3,28 @@ import SwiftUI
 /// Numbered exercise list used on the plan detail page.
 struct ExerciseList: View {
     let exercises: [Exercise]
+    var onSelect: ((Exercise) -> Void)?
+
+    init(exercises: [Exercise], onSelect: ((Exercise) -> Void)? = nil) {
+        self.exercises = exercises
+        self.onSelect = onSelect
+    }
 
     var body: some View {
         VStack(spacing: 12) {
             ForEach(Array(exercises.enumerated()), id: \.element.id) { index, exercise in
-                ExerciseRow(index: index + 1, exercise: exercise)
+                if let onSelect {
+                    Button {
+                        onSelect(exercise)
+                    } label: {
+                        ExerciseRow(index: index + 1, exercise: exercise, showsDisclosure: true)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("plan-exercise-\(exercise.id)")
+                    .accessibilityHint("打开动作库详情")
+                } else {
+                    ExerciseRow(index: index + 1, exercise: exercise)
+                }
             }
         }
     }
@@ -16,6 +33,7 @@ struct ExerciseList: View {
 struct ExerciseRow: View {
     let index: Int
     let exercise: Exercise
+    var showsDisclosure = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -25,10 +43,16 @@ struct ExerciseRow: View {
                 .frame(width: 20, height: 20)
                 .background(Circle().fill(Theme.lightOrange))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(exercise.name)
                     .font(Theme.bodyStrong)
                     .foregroundStyle(Theme.mainText)
+
+                if let muscleLabel = exercise.libraryMuscleLabel {
+                    Text(muscleLabel)
+                        .font(Theme.caption)
+                        .foregroundStyle(Theme.primary)
+                }
 
                 if let weightLabel = exercise.weightLabel {
                     Text(weightLabel)
@@ -43,7 +67,14 @@ struct ExerciseRow: View {
                 .font(Theme.caption)
                 .foregroundStyle(Theme.secondaryText)
                 .monospacedDigit()
+
+            if showsDisclosure {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.secondaryText)
+            }
         }
+        .contentShape(Rectangle())
     }
 }
 

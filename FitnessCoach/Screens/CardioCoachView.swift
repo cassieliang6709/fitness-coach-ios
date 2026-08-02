@@ -17,8 +17,8 @@ struct CardioCoachView: View {
 
             // Same sticky task card component as the strength page.
             CurrentTaskCard(
-                title: MockData.cardioName,
-                metrics: MockData.cardioPrescription,
+                title: session.cardioName,
+                metrics: session.cardioPrescription,
                 progressLabel: session.cardioProgressLabel,
                 progress: session.cardioProgress,
                 pose: session.phase == .cardioComplete ? .thumbsUp : .jogging
