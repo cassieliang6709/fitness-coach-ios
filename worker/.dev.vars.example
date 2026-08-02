@@ -1,3 +1,4 @@
 # Copy to .dev.vars for local `wrangler dev`. NEVER commit .dev.vars.
-ANTHROPIC_API_KEY=sk-ant-your-key-here
+KIMI_API_KEY=sk-your-moonshot-key-here
+MINIMAX_API_KEY=your-minimax-key-here
 APP_SHARED_SECRET=some-long-random-string

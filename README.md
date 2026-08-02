@@ -1,4 +1,6 @@
-# AI 健身教练 — 陪练模块
+# Vance - 健身搭子
+
+基于你的倾向和健身环境，陪你健身并适时引导。
 
 SwiftUI iOS app. One complete module of the product, not the whole app:
 
@@ -103,13 +105,17 @@ cd worker && npm install && npx wrangler deploy
 For a new D1 database, apply `schema.sql`, `seed-exercises.sql`, and
 `seed-names.sql` before deploying the Worker.
 
-Four secrets, set with `wrangler secret put` (never in `wrangler.jsonc`, which
-is public): `ANTHROPIC_API_KEY`, `MINIMAX_API_KEY`, `KIMI_API_KEY`, and
-`APP_SHARED_SECRET`.
+Three secrets, set with `wrangler secret put` (never in `wrangler.jsonc`, which
+is public): `KIMI_API_KEY`, `MINIMAX_API_KEY`, and `APP_SHARED_SECRET`.
+
+`KIMI_API_KEY` covers both coaching turns and gym-photo recognition; MiniMax
+covers speech. Coaching runs on `kimi-k2.6` over Moonshot's OpenAI-compatible
+endpoint, so the SSE contract below is the Worker's own — swapping the upstream
+model does not change what the app parses.
 
 | Route | Auth | Purpose |
 | --- | --- | --- |
-| `GET /health` | Bearer | Reports whether the Claude and MiniMax keys are configured (never their values) |
+| `GET /health` | Bearer | Reports whether the Kimi and MiniMax keys are configured (never their values) |
 | `POST /coach/turn` | Bearer | Streams a coaching turn as SSE |
 | `GET /plan?user=…` | Bearer | Returns that install's active generated plan |
 | `POST /plan?user=…` | Bearer | Validates and stores a catalogue-backed plan |

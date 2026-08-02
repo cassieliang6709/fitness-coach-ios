@@ -25,11 +25,9 @@ import {
 export interface Env {
     /** D1: the shared source of truth for both clients. */
     DB: D1Database;
-    /** Anthropic API key. Set via: wrangler secret put ANTHROPIC_API_KEY */
-    ANTHROPIC_API_KEY: string;
     /** Shared secret the iOS app sends. Set via: wrangler secret put APP_SHARED_SECRET */
     APP_SHARED_SECRET: string;
-    /** Kimi vision key. Set via: wrangler secret put KIMI_API_KEY */
+    /** Kimi key — coaching turns and vision. Set via: wrangler secret put KIMI_API_KEY */
     KIMI_API_KEY: string;
     /** MiniMax speech key. Set via: wrangler secret put MINIMAX_API_KEY */
     MINIMAX_API_KEY: string;
@@ -136,7 +134,7 @@ export default {
             return json({
                 ok: true,
                 // Presence only. The key itself is never returned, logged, or echoed.
-                anthropicKeyConfigured: Boolean(env.ANTHROPIC_API_KEY),
+                kimiKeyConfigured: Boolean(env.KIMI_API_KEY),
                 minimaxKeyConfigured: Boolean(env.MINIMAX_API_KEY),
                 time: new Date().toISOString(),
             });
@@ -171,7 +169,7 @@ export default {
                 perBucket: 6,
             });
 
-            return streamCoachTurn(payload, env.ANTHROPIC_API_KEY, {
+            return streamCoachTurn(payload, env.KIMI_API_KEY, {
                 onPlan: async (plan) => {
                     const checked = await validatePlan(env, plan);
                     if (!checked.ok) return { ok: false, reason: checked.reason };
