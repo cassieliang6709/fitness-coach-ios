@@ -16,10 +16,30 @@ final class CoachThread {
     /// Set when the coach is live. Nil keeps the thread on the scripted path,
     /// which is what demos and UI tests run on.
     var api: CoachAPI?
+    /// MiniMax-backed Vance realtime transport. It owns audio input/output;
+    /// the existing SSE API remains the fallback for text-only deployments.
+    var realtime: RealtimeCoachClient?
+    /// Kimi-backed gym equipment recognition. Its result stays in this same
+    /// thread and becomes context for the next realtime turn.
+    var vision: GymVisionAPI?
+    /// Kimi-backed asynchronous memory extraction. It never sits on the
+    /// request/response path of a coaching turn.
+    var memorySummarizer: MemorySummaryAPI?
     /// Supplies the live training state sent with every request.
     var contextProvider: (@MainActor () -> CoachContext)?
     /// Active memory chips, sent so the coach knows the user's history.
     var memoryProvider: (@MainActor () -> [String])?
+    /// Existing non-location memories used only for Kimi's dedupe pass.
+    var memorySummaryProvider: (@MainActor () -> [String])?
+    /// Commits sanitized Kimi summary output to the local SwiftData store.
+    var memoryUpdateHandler: (@MainActor ([MemorySummary.Update]) -> Void)?
+    /// Commits the high-confidence photo facts and optional device location.
+    var gymObservationHandler: (@MainActor (GymVisionResult, GymLocationSnapshot?) -> Void)?
+    /// Persists the user-authorized location even if Kimi cannot recognize the
+    /// image or the network request fails.
+    var gymLocationHandler: (@MainActor (GymLocationSnapshot) -> Void)?
+    /// Stores local, stage-level timings for each equipment-recognition turn.
+    var gymVisionTimingHandler: (@MainActor (GymVisionTiming) -> Void)?
     /// Executes a coach action against session state and returns the tool
     /// result string the model sees next turn.
     var actionHandler: (@MainActor (CoachAction) -> String)?
@@ -41,8 +61,12 @@ final class CoachThread {
     /// tool_use / tool_result blocks that never render as bubbles.
     private var wire: [WireMessage] = []
     private(set) var lastError: String?
+    private var realtimeBubbleID: String?
+    private var recognizedEquipment: [String] = []
+    private(set) var isVisionRecognizing = false
+    private var memorySummaryWork: Task<Void, Never>?
 
-    var isLive: Bool { api != nil }
+    var isLive: Bool { api != nil || realtime != nil }
 
     init(
         opening: [CoachLine],
@@ -93,6 +117,23 @@ final class CoachThread {
     func beginVoiceTurn() {
         guard !isBusy, work == nil else { return }
 
+        if let realtime {
+            guard let context = currentContext() else { return }
+            voiceState = .listening
+            work = Task { [weak self, realtime] in
+                do {
+                    try await realtime.startVoiceTurn(
+                        context: context,
+                        style: self?.style ?? .practical,
+                        memories: self?.memoryProvider?() ?? []
+                    )
+                } catch {
+                    self?.handleRealtimeFailure(error)
+                }
+            }
+            return
+        }
+
         if let speech {
             work = Task {
                 if speech.availability == .unknown { await speech.requestAccess() }
@@ -132,6 +173,7 @@ final class CoachThread {
             }
             self.voiceState = .processing
             self.append(.init(role: .user, content: transcript))
+            self.scheduleMemorySummary(transcript: ["用户：\(transcript)"])
             self.work = Task {
                 self.voiceState = .speaking
                 if self.isLive {
@@ -156,6 +198,7 @@ final class CoachThread {
             return
         }
         append(.init(role: .user, content: turn.userText))
+        scheduleMemorySummary(transcript: ["用户：\(turn.userText)"])
         voiceState = .speaking
         if isLive {
             await runLiveTurn(userText: turn.userText)
@@ -169,6 +212,13 @@ final class CoachThread {
     /// Tapping the mic while listening ends the sentence early; tapping during
     /// processing or playback aborts the turn.
     func cancelVoiceTurn() {
+        if let realtime, realtime.isRecording {
+            realtime.cancelVoiceTurn()
+            voiceState = .idle
+            isTyping = false
+            finishWork()
+            return
+        }
         if let speech, speech.isRecording {
             speech.stop()
             return
@@ -185,6 +235,26 @@ final class CoachThread {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isBusy, work == nil else { return }
         append(.init(role: .user, content: trimmed))
+        scheduleMemorySummary(transcript: ["用户：\(trimmed)"])
+
+        if let realtime {
+            guard let context = currentContext() else { return }
+            voiceState = .processing
+            isTyping = true
+            work = Task { [weak self, realtime] in
+                do {
+                    try await realtime.sendText(
+                        trimmed,
+                        context: context,
+                        style: self?.style ?? .practical,
+                        memories: self?.memoryProvider?() ?? []
+                    )
+                } catch {
+                    self?.handleRealtimeFailure(error)
+                }
+            }
+            return
+        }
 
         if isLive {
             work = Task {
@@ -202,13 +272,185 @@ final class CoachThread {
         }
     }
 
+    func configureRealtime(_ client: RealtimeCoachClient) {
+        realtime = client
+        client.onEvent = { [weak self] event in self?.handleRealtimeEvent(event) }
+    }
+
+    func configureVision(_ client: GymVisionAPI) {
+        vision = client
+    }
+
+    func configureMemorySummarizer(_ client: MemorySummaryAPI) {
+        memorySummarizer = client
+    }
+
+    /// Keeps photo recognition as a turn in the existing conversation. It
+    /// intentionally renders only high-confidence device names and leaves the
+    /// actual exercise guidance to the following voice turn.
+    func recognizeGymEquipment(
+        imageData: Data,
+        mimeType: String,
+        locationTask: Task<GymLocationLookup, Never>,
+        captureTiming: GymVisionCaptureTiming
+    ) async {
+        guard !isVisionRecognizing, let vision, let context = currentContext() else { return }
+        isVisionRecognizing = true
+        let photoMessage = ChatMessage(role: .user, content: "📷 已上传健身房照片，正在识别器械与定位…")
+        append(photoMessage)
+
+        defer { isVisionRecognizing = false }
+        do {
+            let recognition = try await vision.recognize(
+                imageData: imageData,
+                mimeType: mimeType,
+                conversationID: UUID().uuidString,
+                goal: "减脂与基础体能",
+                userPlan: "阶段：\(context.phase)；当前计划：\(context.exercise)；安排：\(context.prescription)"
+            )
+            let result = recognition.result
+            update(id: photoMessage.id, content: "📷 已上传健身房照片")
+            recognizedEquipment = result.equipment.map(\.name)
+
+            let reply: String
+            if recognizedEquipment.isEmpty {
+                reply = "这张照片里没有能确认的器械。请靠近设备或换个角度再拍。"
+            } else {
+                reply = "已确认设备：\(recognizedEquipment.joined(separator: "、"))。接下来直接和我说话，我会结合它们继续。"
+            }
+            append(.init(role: .assistant, content: reply))
+            let locationLookup = await locationTask.value
+            let location = locationLookup.snapshot
+            if let location { gymLocationHandler?(location) }
+            gymObservationHandler?(result, location)
+            appendLocationMessage(for: location)
+            let timing = GymVisionTiming(
+                capturedAt: captureTiming.startedAt,
+                imageBytes: captureTiming.imageBytes,
+                jpegElapsedMilliseconds: captureTiming.jpegElapsedMilliseconds,
+                clientRequestElapsedMilliseconds: recognition.clientRequestElapsedMilliseconds,
+                gatewayElapsedMilliseconds: result.timing?.gatewayElapsedMilliseconds,
+                kimiElapsedMilliseconds: result.timing?.kimiElapsedMilliseconds,
+                locationElapsedMilliseconds: locationLookup.elapsedMilliseconds,
+                succeeded: true
+            )
+            gymVisionTimingHandler?(timing)
+        } catch {
+            update(id: photoMessage.id, content: "📷 器械照片未识别")
+            let message = (error as? LocalizedError)?.errorDescription ?? "器械识别暂不可用"
+            append(.init(role: .assistant, content: message))
+            let failedRequestElapsedMilliseconds = Int(Date().timeIntervalSince(captureTiming.startedAt) * 1_000) - captureTiming.jpegElapsedMilliseconds
+            let locationLookup = await locationTask.value
+            let location = locationLookup.snapshot
+            if let location { gymLocationHandler?(location) }
+            appendLocationMessage(for: location)
+            let timing = GymVisionTiming(
+                capturedAt: captureTiming.startedAt,
+                imageBytes: captureTiming.imageBytes,
+                jpegElapsedMilliseconds: captureTiming.jpegElapsedMilliseconds,
+                clientRequestElapsedMilliseconds: failedRequestElapsedMilliseconds,
+                gatewayElapsedMilliseconds: nil,
+                kimiElapsedMilliseconds: nil,
+                locationElapsedMilliseconds: locationLookup.elapsedMilliseconds,
+                succeeded: false
+            )
+            gymVisionTimingHandler?(timing)
+        }
+    }
+
+    private func appendLocationMessage(for location: GymLocationSnapshot?) {
+        let name = location?.displayName ?? "未能获取明确地点"
+        append(.init(role: .assistant, content: "地点：\(name)"))
+    }
+
+    private func currentContext() -> CoachContext? {
+        guard var context = contextProvider?() else { return nil }
+        context.availableEquipment = recognizedEquipment.isEmpty ? nil : recognizedEquipment
+        return context
+    }
+
+    /// Snapshot the small, untrusted event payload before starting an async
+    /// network wait. UI updates are handed back through the main-actor closure,
+    /// so an unavailable Kimi endpoint can never stall the live coach.
+    private func scheduleMemorySummary(transcript: [String]) {
+        guard
+            let memorySummarizer,
+            let memoryUpdateHandler
+        else { return }
+        let memories = memorySummaryProvider?() ?? memoryProvider?() ?? []
+        // Keep one current summary worker per coaching thread. A newer user
+        // turn supersedes stale context instead of building a request queue.
+        memorySummaryWork?.cancel()
+        memorySummaryWork = Task(priority: .background) {
+            guard !Task.isCancelled else { return }
+            do {
+                let summary = try await memorySummarizer.summarize(
+                    transcript: transcript,
+                    existingMemories: memories
+                )
+                guard !Task.isCancelled, !summary.updates.isEmpty else { return }
+                memoryUpdateHandler(summary.updates)
+            } catch {
+                // Summaries are an enhancement. The next turn and local data
+                // remain usable when Kimi is offline or times out.
+            }
+        }
+    }
+
+    private func handleRealtimeEvent(_ event: RealtimeCoachClient.Event) {
+        switch event {
+        case .connected:
+            return
+        case .userTranscript(let text):
+            guard !text.isEmpty else { return }
+            append(.init(role: .user, content: text))
+            scheduleMemorySummary(transcript: ["用户：\(text)"])
+        case .assistantDelta(let delta):
+            voiceState = .speaking
+            isTyping = false
+            if let realtimeBubbleID {
+                update(id: realtimeBubbleID, content: messageContent(id: realtimeBubbleID) + delta)
+            } else {
+                let message = ChatMessage(role: .assistant, content: delta)
+                realtimeBubbleID = message.id
+                append(message)
+            }
+        case .audio:
+            voiceState = .speaking
+        case .discardedInput:
+            voiceState = .idle
+            isTyping = false
+            finishWork()
+        case .done:
+            realtimeBubbleID = nil
+            voiceState = .idle
+            isTyping = false
+            finishWork()
+        case .failed(let message):
+            handleRealtimeFailure(VanceGatewayError.upstream(message))
+        }
+    }
+
+    private func handleRealtimeFailure(_ error: Error) {
+        realtimeBubbleID = nil
+        voiceState = .idle
+        isTyping = false
+        lastError = (error as? LocalizedError)?.errorDescription ?? "实时教练连接失败"
+        append(.init(role: .assistant, content: "实时连接暂不可用，先按当前配置继续。"))
+        finishWork()
+    }
+
+    private func messageContent(id: String) -> String {
+        messages.first(where: { $0.id == id })?.content ?? ""
+    }
+
     // MARK: - Live turn
 
     /// One round trip to the Worker. Streams text into a single growing bubble,
     /// executes any tool calls, and — if tools ran — sends their results back so
     /// the coach can close the turn.
     private func runLiveTurn(userText: String, depth: Int = 0) async {
-        guard let api, let context = contextProvider?() else { return }
+        guard let api, let context = currentContext() else { return }
 
         wire.append(.user(userText))
         lastError = nil

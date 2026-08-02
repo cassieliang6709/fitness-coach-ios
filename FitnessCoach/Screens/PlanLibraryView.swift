@@ -54,6 +54,151 @@ struct MemoryChipRow: View {
     }
 }
 
+/// The editable source of truth behind the compact chips in “我的计划”.
+/// Disabling is used instead of hard-deleting so a Kimi or manual correction
+/// does not silently erase the user's history.
+struct MemoryLibrarySheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.workoutStore) private var store
+
+    @Query(
+        filter: #Predicate<MemoryRecord> { $0.active },
+        sort: \MemoryRecord.updatedAt,
+        order: .reverse
+    )
+    private var memories: [MemoryRecord]
+
+    @State private var selectedID: String?
+    @State private var draft = ""
+    @State private var category: MemoryCategory = .preference
+    @State private var isShowingEditor = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if memories.isEmpty {
+                    ContentUnavailableView("还没有记忆", systemImage: "brain.head.profile")
+                } else {
+                    ForEach(memories) { memory in
+                        Button {
+                            selectedID = memory.id
+                            draft = memory.text
+                            category = memory.category
+                            isShowingEditor = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: memory.category.symbol)
+                                    .foregroundStyle(Theme.primary)
+                                    .frame(width: 20)
+                                Text(memory.text)
+                                    .foregroundStyle(Theme.mainText)
+                                    .multilineTextAlignment(.leading)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Theme.secondaryText)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("记忆库")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("完成") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        selectedID = nil
+                        draft = ""
+                        category = .preference
+                        isShowingEditor = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("添加记忆")
+                }
+            }
+            .sheet(isPresented: $isShowingEditor) {
+                MemoryEditorSheet(
+                    title: selectedID == nil ? "添加记忆" : "修改记忆",
+                    draft: $draft,
+                    category: $category,
+                    canDisable: selectedID != nil,
+                    onSave: save,
+                    onDisable: disable
+                )
+            }
+        }
+    }
+
+    private func save() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        if let selectedID {
+            store?.updateMemory(id: selectedID, category: category, text: text)
+        } else {
+            store?.upsertMemory(
+                id: "manual-\(UUID().uuidString)",
+                category: category,
+                text: text,
+                sourceSessionID: nil
+            )
+        }
+        isShowingEditor = false
+    }
+
+    private func disable() {
+        guard let selectedID else { return }
+        store?.deactivateMemory(id: selectedID)
+        isShowingEditor = false
+    }
+}
+
+private struct MemoryEditorSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    @Binding var draft: String
+    @Binding var category: MemoryCategory
+    let canDisable: Bool
+    let onSave: () -> Void
+    let onDisable: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Picker("类型", selection: $category) {
+                    ForEach(MemoryCategory.allCases, id: \.self) { category in
+                        Label(category.label, systemImage: category.symbol).tag(category)
+                    }
+                }
+                TextField("例如：右膝不适，避免跳跃", text: $draft, axis: .vertical)
+                    .lineLimit(2...5)
+                if canDisable {
+                    Button("不再使用这条记忆", role: .destructive) {
+                        onDisable()
+                        dismiss()
+                    }
+                }
+            }
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("保存") {
+                        onSave()
+                        dismiss()
+                    }
+                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+}
+
 /// Minimal wrapping layout — chips flow onto the next line instead of
 /// overflowing the viewport.
 struct FlowLayout: Layout {

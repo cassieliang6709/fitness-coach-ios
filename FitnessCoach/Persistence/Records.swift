@@ -41,6 +41,90 @@ final class MemoryRecord {
     }
 }
 
+/// A confirmed piece of gym equipment observed in a photo. This is separate
+/// from the short memory text so future plans can query the factual history.
+@Model
+final class EquipmentRecord {
+    @Attribute(.unique) var id: String
+    var name: String
+    var confidence: String
+    var visibleEvidence: String
+    var firstObservedAt: Date
+    var lastObservedAt: Date
+    var observationCount: Int
+    var lastLocationID: String?
+
+    init(
+        id: String,
+        name: String,
+        confidence: String,
+        visibleEvidence: String,
+        observedAt: Date = .now,
+        locationID: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.confidence = confidence
+        self.visibleEvidence = visibleEvidence
+        self.firstObservedAt = observedAt
+        self.lastObservedAt = observedAt
+        self.observationCount = 1
+        self.lastLocationID = locationID
+    }
+}
+
+/// A user-authorized gym location captured with a camera observation. The
+/// coordinate is retained locally in SwiftData; no location is sent to Kimi.
+@Model
+final class GymLocationRecord {
+    @Attribute(.unique) var id: String
+    var latitude: Double
+    var longitude: Double
+    var horizontalAccuracy: Double
+    var placeName: String?
+    var firstObservedAt: Date
+    var lastObservedAt: Date
+    var observationCount: Int
+
+    init(id: String, snapshot: GymLocationSnapshot) {
+        self.id = id
+        self.latitude = snapshot.latitude
+        self.longitude = snapshot.longitude
+        self.horizontalAccuracy = snapshot.horizontalAccuracy
+        self.placeName = snapshot.displayName
+        self.firstObservedAt = snapshot.capturedAt
+        self.lastObservedAt = snapshot.capturedAt
+        self.observationCount = 1
+    }
+}
+
+/// Local-only performance facts for a photo-recognition attempt. They are
+/// deliberately not mixed into the user's coaching memories or sent upstream.
+@Model
+final class GymVisionTimingRecord {
+    @Attribute(.unique) var id: String
+    var capturedAt: Date
+    var imageBytes: Int
+    var jpegElapsedMilliseconds: Int
+    var clientRequestElapsedMilliseconds: Int
+    var gatewayElapsedMilliseconds: Int?
+    var kimiElapsedMilliseconds: Int?
+    var locationElapsedMilliseconds: Int
+    var succeeded: Bool
+
+    init(id: String = UUID().uuidString, timing: GymVisionTiming) {
+        self.id = id
+        self.capturedAt = timing.capturedAt
+        self.imageBytes = timing.imageBytes
+        self.jpegElapsedMilliseconds = timing.jpegElapsedMilliseconds
+        self.clientRequestElapsedMilliseconds = timing.clientRequestElapsedMilliseconds
+        self.gatewayElapsedMilliseconds = timing.gatewayElapsedMilliseconds
+        self.kimiElapsedMilliseconds = timing.kimiElapsedMilliseconds
+        self.locationElapsedMilliseconds = timing.locationElapsedMilliseconds
+        self.succeeded = timing.succeeded
+    }
+}
+
 /// The welcome flow's answers. Its existence is also the "has this user been
 /// onboarded" flag — one row, id `me`.
 @Model

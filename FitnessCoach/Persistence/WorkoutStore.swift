@@ -17,6 +17,9 @@ final class WorkoutStore {
 
     static let schema = Schema([
         MemoryRecord.self,
+        EquipmentRecord.self,
+        GymLocationRecord.self,
+        GymVisionTimingRecord.self,
         ProfileRecord.self,
         SessionRecord.self,
         SetLogRecord.self,
@@ -130,6 +133,81 @@ final class WorkoutStore {
         save()
     }
 
+    func updateMemory(id: String, category: MemoryCategory, text: String) {
+        let descriptor = FetchDescriptor<MemoryRecord>(predicate: #Predicate { $0.id == id })
+        guard let record = try? context.fetch(descriptor).first else { return }
+        record.category = category
+        record.text = text
+        record.updatedAt = .now
+        save()
+    }
+
+    func deactivateMemory(id: String) {
+        let descriptor = FetchDescriptor<MemoryRecord>(predicate: #Predicate { $0.id == id })
+        guard let record = try? context.fetch(descriptor).first else { return }
+        record.active = false
+        record.updatedAt = .now
+        save()
+    }
+
+    /// Persists an authorized location as soon as the camera flow captures it,
+    /// even if the later network image recognition fails.
+    func recordGymLocation(_ snapshot: GymLocationSnapshot) {
+        _ = upsertGymLocation(snapshot)
+        save()
+    }
+
+    func recordGymVisionTiming(_ timing: GymVisionTiming) {
+        context.insert(GymVisionTimingRecord(timing: timing))
+        save()
+    }
+
+    /// Saves the factual photo observation and its user-authorized location.
+    /// The paired memory chips are just a compact, editable projection of
+    /// these tables for the planning UI and the coach prompt.
+    func recordGymObservation(
+        equipment: [GymVisionResult.Equipment],
+        location: GymLocationSnapshot?
+    ) {
+        let locationID = location.map { ensureGymLocation($0) }
+        for item in equipment {
+            let normalizedName = item.name
+                .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+                .lowercased()
+            let id = "equipment-\(normalizedName.replacingOccurrences(of: " ", with: "-"))"
+            let descriptor = FetchDescriptor<EquipmentRecord>(predicate: #Predicate { $0.id == id })
+            if let existing = try? context.fetch(descriptor).first {
+                existing.confidence = item.confidence
+                existing.visibleEvidence = item.visibleEvidence
+                existing.lastObservedAt = .now
+                existing.observationCount += 1
+                existing.lastLocationID = locationID
+            } else {
+                context.insert(EquipmentRecord(
+                    id: id,
+                    name: item.name,
+                    confidence: item.confidence,
+                    visibleEvidence: item.visibleEvidence,
+                    locationID: locationID
+                ))
+            }
+            // Older builds stored one memory for every device. Once this
+            // observation is merged below, hide those legacy fragments.
+            deactivateMemory(id: "memory-\(id)")
+        }
+        if let location, let locationID, let placeName = location.displayName {
+            let equipmentNames = equipmentAtLocation(locationID)
+            upsertMemory(
+                id: "memory-gym-\(locationID)",
+                category: .equipment,
+                text: "\(placeName) · \(equipmentNames.joined(separator: "、"))",
+                sourceSessionID: nil
+            )
+            deactivateMemory(id: "memory-venue-\(locationID)")
+        }
+        save()
+    }
+
     // MARK: - Sessions
 
     func createSession(
@@ -186,6 +264,9 @@ final class WorkoutStore {
 
     /// Deletes everything. Used by UI tests and the debug reset.
     func wipe() {
+        try? context.delete(model: EquipmentRecord.self)
+        try? context.delete(model: GymLocationRecord.self)
+        try? context.delete(model: GymVisionTimingRecord.self)
         try? context.delete(model: SetLogRecord.self)
         try? context.delete(model: SessionRecord.self)
         try? context.delete(model: MemoryRecord.self)
@@ -198,5 +279,43 @@ final class WorkoutStore {
     private func save() {
         guard context.hasChanges else { return }
         try? context.save()
+    }
+
+    private func upsertGymLocation(_ snapshot: GymLocationSnapshot) -> String {
+        // ~11 m precision keeps repeat visits to one gym together without
+        // storing a falsely exact, constantly changing GPS identity.
+        let id = gymLocationID(snapshot)
+        let descriptor = FetchDescriptor<GymLocationRecord>(predicate: #Predicate { $0.id == id })
+        if let existing = try? context.fetch(descriptor).first {
+            existing.horizontalAccuracy = snapshot.horizontalAccuracy
+            if let placeName = snapshot.displayName { existing.placeName = placeName }
+            existing.lastObservedAt = snapshot.capturedAt
+            existing.observationCount += 1
+        } else {
+            context.insert(GymLocationRecord(id: id, snapshot: snapshot))
+        }
+        return id
+    }
+
+    private func equipmentAtLocation(_ locationID: String) -> [String] {
+        let records = (try? context.fetch(FetchDescriptor<EquipmentRecord>())) ?? []
+        var seen = Set<String>()
+        return records
+            .filter { $0.lastLocationID == locationID }
+            .map(\.name)
+            .filter { seen.insert($0).inserted }
+    }
+
+    private func ensureGymLocation(_ snapshot: GymLocationSnapshot) -> String {
+        let id = gymLocationID(snapshot)
+        let descriptor = FetchDescriptor<GymLocationRecord>(predicate: #Predicate { $0.id == id })
+        if (try? context.fetch(descriptor).first) == nil {
+            context.insert(GymLocationRecord(id: id, snapshot: snapshot))
+        }
+        return id
+    }
+
+    private func gymLocationID(_ snapshot: GymLocationSnapshot) -> String {
+        String(format: "gym-%.4f-%.4f", snapshot.latitude, snapshot.longitude)
     }
 }

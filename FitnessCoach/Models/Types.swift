@@ -101,7 +101,7 @@ struct WorkoutPlan: Identifiable, Hashable {
 
 // MARK: - Memory
 
-enum MemoryCategory: String, Hashable {
+enum MemoryCategory: String, CaseIterable, Hashable, Codable, Sendable {
     case injury
     case preference
     case venue
@@ -112,7 +112,16 @@ enum MemoryCategory: String, Hashable {
         case .injury: return "figure.walk.motion"
         case .preference: return "slider.horizontal.3"
         case .venue: return "mappin.and.ellipse"
-        case .equipment: return "dumbbell"
+        case .equipment: return "checkmark.square.fill"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .injury: return "身体限制"
+        case .preference: return "训练偏好"
+        case .venue: return "训练地点"
+        case .equipment: return "器械"
         }
     }
 }
@@ -122,6 +131,46 @@ struct WorkoutMemory: Identifiable, Hashable {
     let category: MemoryCategory
     let text: String
     var active: Bool = true
+}
+
+/// A foreground location captured after user authorization. `placeName` is a
+/// compact reverse-geocoded label for the current gym, never a coordinate.
+struct GymLocationSnapshot: Sendable, Hashable {
+    let latitude: Double
+    let longitude: Double
+    let horizontalAccuracy: Double
+    let placeName: String?
+    let capturedAt: Date
+
+    var displayName: String? {
+        placeName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
+struct GymLocationLookup: Sendable, Hashable {
+    let snapshot: GymLocationSnapshot?
+    let elapsedMilliseconds: Int
+}
+
+struct GymVisionCaptureTiming: Sendable, Hashable {
+    let startedAt: Date
+    let jpegElapsedMilliseconds: Int
+    let imageBytes: Int
+}
+
+struct GymVisionTiming: Sendable, Hashable {
+    let capturedAt: Date
+    let imageBytes: Int
+    let jpegElapsedMilliseconds: Int
+    let clientRequestElapsedMilliseconds: Int
+    let gatewayElapsedMilliseconds: Int?
+    let kimiElapsedMilliseconds: Int?
+    let locationElapsedMilliseconds: Int
+    let succeeded: Bool
 }
 
 // MARK: - Chat
