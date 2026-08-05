@@ -4,7 +4,9 @@ WORKDIR /app
 
 # 安装依赖（只要 workerd，不要 wrangler）
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev && \
+    # 手动安装 workerd（生产环境只需要这个）
+    npm install workerd --no-save
 
 # 拷贝源码和配置
 COPY src ./src
