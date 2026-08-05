@@ -65,6 +65,13 @@ final class CoachThread {
     private var recognizedEquipment: [String] = []
     private(set) var isVisionRecognizing = false
     private var memorySummaryWork: Task<Void, Never>?
+    /// Converged location awaiting the user's map confirmation. Reading it in a
+    /// view's body presents the picker; `confirmLocation`/`dismissLocationPicker`
+    /// clear it so the sheet never re-presents after a swipe-down.
+    private(set) var pendingLocationSnapshot: GymLocationSnapshot?
+    /// The last successful recognition, kept so a later confirmed location can
+    /// be attached to the same equipment observation.
+    private var lastVisionResult: GymVisionResult?
 
     var isLive: Bool { api != nil || realtime != nil }
 
@@ -285,9 +292,27 @@ final class CoachThread {
         memorySummarizer = client
     }
 
+    /// The user confirmed a POI (or accepted the current location) on the map.
+    /// The confirmed snapshot is persisted once, then the picker is dismissed.
+    func confirmLocation(_ snapshot: GymLocationSnapshot) {
+        guard pendingLocationSnapshot != nil else { return }
+        pendingLocationSnapshot = nil
+        gymLocationHandler?(snapshot)
+        if let result = lastVisionResult {
+            gymObservationHandler?(result, snapshot)
+        }
+    }
+
+    /// Dismiss the location picker without persisting. The photo's equipment is
+    /// still recognized; only the location is skipped.
+    func dismissLocationPicker() {
+        pendingLocationSnapshot = nil
+    }
+
     /// Keeps photo recognition as a turn in the existing conversation. It
     /// intentionally renders only high-confidence device names and leaves the
-    /// actual exercise guidance to the following voice turn.
+    /// actual exercise guidance to the following voice turn. The location is
+    /// only persisted after the user confirms it on the map.
     func recognizeGymEquipment(
         imageData: Data,
         mimeType: String,
@@ -311,6 +336,7 @@ final class CoachThread {
             let result = recognition.result
             update(id: photoMessage.id, content: "📷 已上传健身房照片")
             recognizedEquipment = result.equipment.map(\.name)
+            lastVisionResult = result
 
             let reply: String
             if recognizedEquipment.isEmpty {
@@ -319,11 +345,15 @@ final class CoachThread {
                 reply = "已确认设备：\(recognizedEquipment.joined(separator: "、"))。接下来直接和我说话，我会结合它们继续。"
             }
             append(.init(role: .assistant, content: reply))
+
+            // Equipment is persisted immediately; the location waits for the
+            // user's map confirmation so a wrong GPS fix never lands in memory.
+            gymObservationHandler?(result, nil)
             let locationLookup = await locationTask.value
-            let location = locationLookup.snapshot
-            if let location { gymLocationHandler?(location) }
-            gymObservationHandler?(result, location)
-            appendLocationMessage(for: location)
+            if let snapshot = locationLookup.snapshot {
+                pendingLocationSnapshot = snapshot
+            }
+
             let timing = GymVisionTiming(
                 capturedAt: captureTiming.startedAt,
                 imageBytes: captureTiming.imageBytes,
@@ -341,9 +371,9 @@ final class CoachThread {
             append(.init(role: .assistant, content: message))
             let failedRequestElapsedMilliseconds = Int(Date().timeIntervalSince(captureTiming.startedAt) * 1_000) - captureTiming.jpegElapsedMilliseconds
             let locationLookup = await locationTask.value
-            let location = locationLookup.snapshot
-            if let location { gymLocationHandler?(location) }
-            appendLocationMessage(for: location)
+            if let snapshot = locationLookup.snapshot {
+                pendingLocationSnapshot = snapshot
+            }
             let timing = GymVisionTiming(
                 capturedAt: captureTiming.startedAt,
                 imageBytes: captureTiming.imageBytes,

@@ -282,13 +282,18 @@ final class WorkoutStore {
     }
 
     private func upsertGymLocation(_ snapshot: GymLocationSnapshot) -> String {
-        // ~11 m precision keeps repeat visits to one gym together without
-        // storing a falsely exact, constantly changing GPS identity.
+        // A confirmed POI is the stable identity for a gym across visits; the
+        // ~11 m grid is only the fallback when no POI matched. This keeps one
+        // studio from fragmenting into several records when GPS drifts.
         let id = gymLocationID(snapshot)
         let descriptor = FetchDescriptor<GymLocationRecord>(predicate: #Predicate { $0.id == id })
         if let existing = try? context.fetch(descriptor).first {
             existing.horizontalAccuracy = snapshot.horizontalAccuracy
             if let placeName = snapshot.displayName { existing.placeName = placeName }
+            if let poi = snapshot.poi {
+                existing.poiName = poi.name
+                existing.poiAddress = poi.address
+            }
             existing.lastObservedAt = snapshot.capturedAt
             existing.observationCount += 1
         } else {
@@ -315,7 +320,12 @@ final class WorkoutStore {
         return id
     }
 
+    /// Stable identity: a confirmed POI wins; otherwise snap to a ~11 m grid so
+    /// repeated fixes near one spot stay together without pretending to be exact.
     private func gymLocationID(_ snapshot: GymLocationSnapshot) -> String {
-        String(format: "gym-%.4f-%.4f", snapshot.latitude, snapshot.longitude)
+        if let poi = snapshot.poi {
+            return "gym-poi-\(poi.id)"
+        }
+        return String(format: "gym-%.4f-%.4f", snapshot.latitude, snapshot.longitude)
     }
 }

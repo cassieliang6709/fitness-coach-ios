@@ -1,6 +1,5 @@
 import SwiftData
 import SwiftUI
-@preconcurrency import CoreLocation
 import UIKit
 
 /// /home — the app's root after onboarding.
@@ -41,6 +40,35 @@ struct HomeView: View {
             }
         }
         .onAppear { session.daily.startIfNeeded() }
+        .sheet(
+            item: locationPickerBinding,
+            onDismiss: {
+                // A swipe-down cancels without persisting; the equipment photo
+                // is already saved, only the location is skipped.
+                if session.daily.pendingLocationSnapshot != nil {
+                    session.daily.dismissLocationPicker()
+                }
+            }
+        ) { snapshot in
+            GymLocationPicker(
+                snapshot: snapshot,
+                onConfirm: { session.daily.confirmLocation($0) },
+                onDismiss: { session.daily.dismissLocationPicker() }
+            )
+        }
+    }
+
+    /// Read-only presentation binding that routes dismissal through the thread,
+    /// keeping the location state encapsulated on the coach thread.
+    private var locationPickerBinding: Binding<GymLocationSnapshot?> {
+        Binding(
+            get: { session.daily.pendingLocationSnapshot },
+            set: { newValue in
+                if newValue == nil {
+                    session.daily.dismissLocationPicker()
+                }
+            }
+        )
     }
 
     // MARK: - Copy
@@ -243,9 +271,9 @@ private struct HomeInputBar: View {
                 jpegElapsedMilliseconds: Int(Date().timeIntervalSince(captureStartedAt) * 1_000),
                 imageBytes: jpeg.count
             )
-            // Start the foreground location request at the same time as the
-            // Kimi upload. The image path never needs location data, so it
-            // must not wait for GPS or reverse geocoding before it starts.
+            // Start the foreground location convergence at the same time as the
+            // Kimi upload. The image path never needs location data, so it must
+            // not wait for GPS or POI resolution before it starts.
             let locationTask = Task {
                 let startedAt = Date()
                 let snapshot = await GymLocationService.shared.currentLocation()
@@ -325,105 +353,6 @@ private struct GymCameraPicker: UIViewControllerRepresentable {
         }
     }
 }
-
-@MainActor
-private final class GymLocationService: NSObject {
-    static let shared = GymLocationService()
-
-    private let manager = CLLocationManager()
-    private var authorizationContinuation: CheckedContinuation<Bool, Never>?
-    private var locationContinuation: CheckedContinuation<GymLocationSnapshot?, Never>?
-
-    private override init() {
-        super.init()
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-    }
-
-    func currentLocation() async -> GymLocationSnapshot? {
-        guard CLLocationManager.locationServicesEnabled() else { return nil }
-        let status = manager.authorizationStatus
-        let authorized: Bool
-        if status == .notDetermined {
-            authorized = await requestAuthorization()
-        } else {
-            authorized = status == .authorizedAlways || status == .authorizedWhenInUse
-        }
-        guard authorized else { return nil }
-        return await requestLocation()
-    }
-
-    private func requestAuthorization() async -> Bool {
-        await withCheckedContinuation { continuation in
-            authorizationContinuation = continuation
-            manager.requestWhenInUseAuthorization()
-        }
-    }
-
-    private func requestLocation() async -> GymLocationSnapshot? {
-        guard let snapshot = await withCheckedContinuation({ continuation in
-            locationContinuation = continuation
-            manager.requestLocation()
-        }) else { return nil }
-        return await addingPlaceName(to: snapshot)
-    }
-
-    private func addingPlaceName(to snapshot: GymLocationSnapshot) async -> GymLocationSnapshot {
-        let location = CLLocation(latitude: snapshot.latitude, longitude: snapshot.longitude)
-        let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location)
-        let placemark = placemarks?.first
-        let name = placemark.flatMap { placemark in
-            let locality = [placemark.subLocality, placemark.locality]
-                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-                .joined(separator: " · ")
-            let candidates: [String?] = [
-                placemark.areasOfInterest?.first,
-                placemark.name,
-                locality.isEmpty ? nil : locality,
-            ]
-            return candidates.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .first { !$0.isEmpty }
-        }
-        return GymLocationSnapshot(
-            latitude: snapshot.latitude,
-            longitude: snapshot.longitude,
-            horizontalAccuracy: snapshot.horizontalAccuracy,
-            placeName: name,
-            capturedAt: snapshot.capturedAt
-        )
-    }
-
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        guard let continuation = authorizationContinuation else { return }
-        authorizationContinuation = nil
-        let status = manager.authorizationStatus
-        continuation.resume(returning: status == .authorizedAlways || status == .authorizedWhenInUse)
-    }
-
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let continuation = locationContinuation else { return }
-        locationContinuation = nil
-        guard let location = locations.last, location.horizontalAccuracy >= 0 else {
-            continuation.resume(returning: nil)
-            return
-        }
-        continuation.resume(returning: GymLocationSnapshot(
-            latitude: location.coordinate.latitude,
-            longitude: location.coordinate.longitude,
-            horizontalAccuracy: location.horizontalAccuracy,
-            placeName: nil,
-            capturedAt: .now
-        ))
-    }
-
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        locationContinuation?.resume(returning: nil)
-        locationContinuation = nil
-    }
-}
-
-extension GymLocationService: @preconcurrency CLLocationManagerDelegate {}
 
 // MARK: - Plan tab
 
