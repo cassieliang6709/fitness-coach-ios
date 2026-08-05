@@ -18,3 +18,10 @@ Vance_Coach_Gateway_Handoff_20260802/*
 vance-gateway/.env
 vance-gateway/data/
 vance-gateway/node_modules/
+
+# Vance backend 本地密钥和运行时数据
+backend/.env
+backend/worker/.dev.vars
+backend/gateway/.env
+backend/gateway/data/
+backend/**/node_modules/

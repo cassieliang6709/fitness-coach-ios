@@ -1,0 +1,41 @@
+# Vance Backend — 与 sourcerlinda 完全隔离的独立 compose 项目
+name: vance
+
+services:
+  worker:
+    build:
+      context: ./worker
+    container_name: vance-worker
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.5
+    env_file:
+      - .env
+    environment:
+      # 把 .env 里的 VANCE_WORKER_SECRET 映射成 worker 代码期望的 APP_SHARED_SECRET
+      APP_SHARED_SECRET: ${VANCE_WORKER_SECRET}
+    networks:
+      - vance
+    # 不暴露公网端口，只在 vance 内网可达，由外部 nginx 反代
+
+  gateway:
+    build:
+      context: ./gateway
+    container_name: vance-gateway
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    env_file:
+      - .env
+    environment:
+      # 映射到 gateway 代码期望的变量名
+      VANCE_GATEWAY_SHARED_SECRET: ${VANCE_GATEWAY_SECRET}
+      BIND_HOST: 0.0.0.0
+      PORT: 8787
+    networks:
+      - vance
+
+networks:
+  vance:
+    name: vance
+    driver: bridge

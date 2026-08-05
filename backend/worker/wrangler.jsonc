@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "fitness-coach-api",
-  "main": "src/index.ts",
+  "main": "dist/index.js",
   "compatibility_date": "2025-11-01",
   // Required by Worker dependencies that import node: built-ins.
   "compatibility_flags": ["nodejs_compat"],
