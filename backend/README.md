@@ -8,7 +8,7 @@ FitnessCoach iOS App 的后端服务，包含文字对话/计划生成 Worker �
 iPhone App
     ↓ HTTPS / WSS
 realtime.magicandgrind.com (nginx)
-    ├─ /api/*     → vance-worker:8788  (DeepSeek 文字+计划)
+    ├─ /*         → vance-worker:8788  (DeepSeek 文字+计划)
     ├─ /realtime  → vance-gateway:8787 (MiniMax Realtime WS)
     └─ /gateway/* → vance-gateway:8787 (GymVision 等)
 ```
@@ -81,8 +81,9 @@ REALTIME_GATEWAY_HOST = 192.168.1.x:8787
 COACH_API_HOST = realtime.magicandgrind.com
 REALTIME_GATEWAY_HOST = realtime.magicandgrind.com
 
-# 密钥从 backend/.env 复制
+# 密钥从 backend/.env 复制（不要提交 Secrets.xcconfig）
 COACH_SHARED_SECRET = <VANCE_WORKER_SECRET>
+REALTIME_GATEWAY_SECRET = <VANCE_GATEWAY_SECRET>
 ```
 
 ## 部署到生产
@@ -227,4 +228,4 @@ docker system df
 - 不同域名
 - 不同代码仓库（sourcerlinda 在 caizhidian-ops/sourcerlinda）
 
-唯一交叉点：nginx server 块要加到 sourcerlinda 主仓库的 `docker/nginx/nginx.conf` 模板里（因为 nginx 容器是 sourcerlinda 的）。
+唯一交叉点：nginx server 块要加到 sourcerlinda 主仓库的 `docker/nginx/nginx.conf` 模板里（因为 nginx 容器是 sourcerlinda 的）。该块必须直接放在 `http {}` 内；同时需要把 nginx 服务持久加入外部 Docker 网络 `vance`。不要把 `map` 写进 `server {}`，也不要直接编辑某个 ECS release 目录——两者都会让共享 nginx 无法启动或在下次发布时丢失。

@@ -602,13 +602,13 @@ final class RealtimeSession {
     }
 
     /// Gateway can be exposed through a temporary or deployed TLS tunnel for
-    /// real-device testing. Reuse the app's shared secret so the public
-    /// WebSocket is never an unauthenticated path to the provider key.
+    /// real-device testing. It has its own app-facing secret, so a Worker-key
+    /// rotation cannot silently authenticate the realtime provider path.
     static func gatewayRequest(conversationId: String) -> URLRequest? {
         guard let url = gatewayURL(conversationId: conversationId) else { return nil }
         var request = URLRequest(url: url)
         let secret =
-            (Bundle.main.infoDictionary?["COACH_SHARED_SECRET"] as? String)?
+            (Bundle.main.infoDictionary?["REALTIME_GATEWAY_SECRET"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !secret.isEmpty, !secret.contains("$(") {
             request.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
