@@ -1,9 +1,8 @@
-FROM node:22-alpine
+FROM node:22-slim
 
 WORKDIR /app
 
-# 直接装平台特定的 workerd 二进制包（跳过 wrapper 的下载脚本）
-# workerd 主包会通过 optionalDependencies 拉 @cloudflare/workerd-linux-64
+# 直接装平台特定的 workerd 二进制包
 RUN npm install @cloudflare/workerd-linux-64 @anthropic-ai/sdk --no-save --no-package-lock
 
 # 拷贝源码和配置
