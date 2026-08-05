@@ -20,8 +20,8 @@ ENV NODE_ENV=production
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "require('http').get('http://127.0.0.1:8788/health', r => process.exit(r.statusCode === 200 || r.statusCode === 401 ? 0 : 1)).on('error', () => process.exit(1))"
 
-# 直接用 workerd，不走 wrangler（避免 npx 下载）
-CMD ["node_modules/.bin/workerd", "serve", "--binary", "--experimental", \
+# 直接用 workerd，不走 npx（避免触发 wrangler 下载）
+CMD ["/app/node_modules/workerd/bin/workerd", "serve", "--binary", "--experimental", \
      "--socket-addr=entry=0.0.0.0:8788", \
      "--external-addr=loopback=127.0.0.1:50510", \
      "--control-fd=3", \
