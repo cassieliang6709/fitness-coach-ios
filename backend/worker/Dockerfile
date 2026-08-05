@@ -2,10 +2,12 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# 安装依赖（只要 workerd，不要 wrangler）
-COPY package.json package-lock.json ./
+# 用生产版 package.json（去掉 wrangler，避免 npx 触发下载）
+COPY package.prod.json package.json
+COPY package-lock.json ./
+
+# 只安装生产依赖 + workerd
 RUN npm ci --omit=dev && \
-    # 手动安装 workerd（生产环境只需要这个）
     npm install workerd --no-save
 
 # 拷贝源码和配置
@@ -20,7 +22,7 @@ ENV NODE_ENV=production
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "require('http').get('http://127.0.0.1:8788/health', r => process.exit(r.statusCode === 200 || r.statusCode === 401 ? 0 : 1)).on('error', () => process.exit(1))"
 
-# 直接用 workerd，不走 npx（避免触发 wrangler 下载）
+# 直接用 workerd 绝对路径
 CMD ["/app/node_modules/workerd/bin/workerd", "serve", "--binary", "--experimental", \
      "--socket-addr=entry=0.0.0.0:8788", \
      "--external-addr=loopback=127.0.0.1:50510", \
