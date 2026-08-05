@@ -11,8 +11,8 @@ RUN npm ci
 COPY src ./src
 COPY tsconfig.json ./
 
-# 用 esbuild 打包成单文件
-RUN npx esbuild src/index.ts --bundle --format=esm --target=es2022 \
+# 用 esbuild 打包成单文件（CJS 格式，workerd 兼容）
+RUN npx esbuild src/index.ts --bundle --format=cjs --target=es2022 \
     --external:cloudflare:* --external:node:* \
     --outfile=dist/index.js
 
