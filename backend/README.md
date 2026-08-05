@@ -20,6 +20,7 @@ realtime.magicandgrind.com (nginx)
 - 独立密钥 `VANCE_*_SECRET`（不复用 sourcerlinda 的 `APP_SHARED_SECRET`）
 - 独立目录 `/opt/vance/`（不在 `/opt/sourcerlinda-releases/`）
 - 独立 compose 项目 `vance`
+- Worker 的本地 D1 状态保存在 Docker named volume `vance_worker_state`，部署时不得用无状态临时目录替代。
 
 ## 目录结构
 

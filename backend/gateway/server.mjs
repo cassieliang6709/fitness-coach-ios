@@ -12,6 +12,7 @@ loadEnv('.env');
 const minimaxKey = process.env.MINIMAX_API_KEY;
 const kimiKey = process.env.KIMI_API_KEY;
 const sharedSecret = process.env.VANCE_GATEWAY_SHARED_SECRET;
+const deepseekProxySecret = process.env.DEEPSEEK_PROXY_SECRET;
 const port = Number(process.env.PORT || 8787);
 const bindHost = process.env.BIND_HOST || '127.0.0.1';
 const upstreamHost = 'api.minimax.chat';
@@ -70,6 +71,23 @@ async function handleRequest(request, response) {
       kimiConfigured: Boolean(kimiKey),
     });
   }
+  if (url.pathname === '/internal/deepseek' && request.method === 'POST') {
+    if (!internalAuthorized(request)) return sendJson(response, 401, { error: 'unauthorized' });
+    if (!process.env.DEEPSEEK_API_KEY) return sendJson(response, 503, { error: 'deepseek_not_configured' });
+    const body = await readJson(request, 512 * 1024);
+    const upstream = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const contentType = upstream.headers.get('content-type') || 'application/json; charset=utf-8';
+    response.writeHead(upstream.status, { 'content-type': contentType, 'cache-control': 'no-store' });
+    response.end(await upstream.text());
+    return;
+  }
   if (url.pathname === '/api/gym-vision' && request.method === 'POST') {
     if (!authorized(request)) return sendJson(response, 401, { error: 'unauthorized' });
     if (!kimiKey) return sendJson(response, 503, { error: 'KIMI_API_KEY 未配置' });
@@ -102,6 +120,14 @@ function authorized(request) {
   const header = request.headers.authorization || '';
   const candidate = header.startsWith('Bearer ') ? header.slice(7) : '';
   const expected = Buffer.from(sharedSecret);
+  const actual = Buffer.from(candidate);
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+}
+
+function internalAuthorized(request) {
+  const candidate = request.headers['x-vance-internal-key'];
+  if (!deepseekProxySecret || typeof candidate !== 'string') return false;
+  const expected = Buffer.from(deepseekProxySecret);
   const actual = Buffer.from(candidate);
   return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }
