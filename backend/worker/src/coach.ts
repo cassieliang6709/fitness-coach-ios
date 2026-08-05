@@ -258,10 +258,21 @@ export interface CoachHooks {
     >;
 }
 
+/**
+ * Local workerd cannot validate the DeepSeek certificate chain on the ECS,
+ * while the Node Gateway can. The private bridge stays on the Docker network
+ * and requires a secret that never ships in the iOS app.
+ */
+export interface CoachUpstream {
+    endpoint?: string;
+    internalSecret?: string;
+}
+
 export function streamCoachTurn(
     request: CoachRequest,
     apiKey: string,
-    hooks: CoachHooks = {}
+    hooks: CoachHooks = {},
+    upstream: CoachUpstream = {}
 ): Response {
     const encoder = new TextEncoder();
 
@@ -289,11 +300,13 @@ export function streamCoachTurn(
                     ? [...openAITools(), openAIPlanTool(request.shortlist)]
                     : openAITools();
 
-                const response = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
+                const response = await fetch(upstream.endpoint ?? `${DEEPSEEK_BASE}/chat/completions`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": `Bearer ${apiKey}`,
+                        ...(upstream.internalSecret
+                            ? { "X-Vance-Internal-Key": upstream.internalSecret }
+                            : { "Authorization": `Bearer ${apiKey}` }),
                     },
                     body: JSON.stringify({
                         model: DEEPSEEK_MODEL,

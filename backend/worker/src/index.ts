@@ -33,6 +33,8 @@ export interface Env {
     KIMI_API_KEY: string;
     /** MiniMax speech key. Set via: wrangler secret put MINIMAX_API_KEY */
     MINIMAX_API_KEY: string;
+    /** Private gateway-only credential for the Node HTTPS egress bridge. */
+    DEEPSEEK_PROXY_SECRET: string;
 }
 
 function json(data: unknown, status = 200): Response {
@@ -171,14 +173,22 @@ export default {
                 perBucket: 6,
             });
 
-            return streamCoachTurn(payload, env.DEEPSEEK_API_KEY, {
-                onPlan: async (plan) => {
-                    const checked = await validatePlan(env, plan);
-                    if (!checked.ok) return { ok: false, reason: checked.reason };
-                    await savePlan(env, userID, checked.plan);
-                    return { ok: true, plan: checked.plan };
+            return streamCoachTurn(
+                payload,
+                env.DEEPSEEK_API_KEY,
+                {
+                    onPlan: async (plan) => {
+                        const checked = await validatePlan(env, plan);
+                        if (!checked.ok) return { ok: false, reason: checked.reason };
+                        await savePlan(env, userID, checked.plan);
+                        return { ok: true, plan: checked.plan };
+                    },
                 },
-            });
+                {
+                    endpoint: "http://vance-gateway:8787/internal/deepseek",
+                    internalSecret: env.DEEPSEEK_PROXY_SECRET,
+                }
+            );
         }
 
         // The text coach has already decided what to say. MiniMax only voices

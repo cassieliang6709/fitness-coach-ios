@@ -7,13 +7,23 @@ services:
       context: ./worker
     container_name: vance-worker
     restart: unless-stopped
-    mem_limit: 128m
+    # Wrangler owns the D1 emulator as well as workerd; 128 MiB was only
+    # sufficient for the broken bare-workerd setup that had no bindings.
+    mem_limit: 256m
     cpus: 0.5
     env_file:
       - .env
     environment:
       # 把 .env 里的 VANCE_WORKER_SECRET 映射成 worker 代码期望的 APP_SHARED_SECRET
       APP_SHARED_SECRET: ${VANCE_WORKER_SECRET}
+      DEEPSEEK_PROXY_SECRET: ${DEEPSEEK_PROXY_SECRET}
+      # Wrangler only maps container process variables into the Worker when
+      # this is explicit. No .env file is copied into the image.
+      CLOUDFLARE_INCLUDE_PROCESS_ENV: "true"
+    volumes:
+      # Persistent local D1 state; never use a bind-mounted source directory
+      # or a container recreation would discard user plans and memories.
+      - worker_state:/data
     networks:
       - vance
     # 不暴露公网端口，只在 vance 内网可达，由外部 nginx 反代
@@ -30,6 +40,7 @@ services:
     environment:
       # 映射到 gateway 代码期望的变量名
       VANCE_GATEWAY_SHARED_SECRET: ${VANCE_GATEWAY_SECRET}
+      DEEPSEEK_PROXY_SECRET: ${DEEPSEEK_PROXY_SECRET}
       BIND_HOST: 0.0.0.0
       PORT: 8787
     networks:
@@ -39,3 +50,6 @@ networks:
   vance:
     name: vance
     driver: bridge
+
+volumes:
+  worker_state:
