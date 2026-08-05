@@ -32,6 +32,8 @@
 	<string>训练中用麦克风听你说话，把不适和反馈告诉教练。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>用相机拍摄健身器械，识别后记入你的训练记忆。</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>读取近 7 天训练、今日步数和活动能量，仅在本机汇总展示；不用于医疗判断，也不会发送给教练或服务端。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>拍摄器械时记录所在训练地点，帮助教练记住常去的场馆。</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

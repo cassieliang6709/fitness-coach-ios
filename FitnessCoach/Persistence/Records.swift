@@ -82,16 +82,23 @@ final class GymLocationRecord {
     var longitude: Double
     var horizontalAccuracy: Double
     var placeName: String?
+    /// POI-derived identity, kept separate from the display label so repeat
+    /// visits merge even if the reverse-geocoded name drifts.
+    var poiName: String?
+    var poiAddress: String?
     var firstObservedAt: Date
     var lastObservedAt: Date
     var observationCount: Int
 
     init(id: String, snapshot: GymLocationSnapshot) {
+        let coordinate = snapshot.coarseCoordinate
         self.id = id
-        self.latitude = snapshot.latitude
-        self.longitude = snapshot.longitude
+        self.latitude = coordinate.latitude
+        self.longitude = coordinate.longitude
         self.horizontalAccuracy = snapshot.horizontalAccuracy
         self.placeName = snapshot.displayName
+        self.poiName = snapshot.poi?.name
+        self.poiAddress = snapshot.poi?.address
         self.firstObservedAt = snapshot.capturedAt
         self.lastObservedAt = snapshot.capturedAt
         self.observationCount = 1

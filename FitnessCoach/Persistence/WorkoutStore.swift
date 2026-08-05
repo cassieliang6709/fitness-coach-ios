@@ -107,6 +107,15 @@ final class WorkoutStore {
         return (try? context.fetch(descriptor)) ?? []
     }
 
+    /// The coach runs through remote providers. Venue names and GPS-derived
+    /// location must remain local, including records produced by older builds
+    /// that stored a venue/equipment projection under the equipment category.
+    func remoteCoachMemories() -> [String] {
+        activeMemories()
+            .filter { $0.category != .venue && !$0.id.hasPrefix("memory-gym-") }
+            .map(\.text)
+    }
+
     /// Upserts by id so a repeated observation updates rather than piles up.
     func upsertMemory(
         id: String,
@@ -183,13 +192,14 @@ final class WorkoutStore {
                 existing.observationCount += 1
                 existing.lastLocationID = locationID
             } else {
-                context.insert(EquipmentRecord(
-                    id: id,
-                    name: item.name,
-                    confidence: item.confidence,
-                    visibleEvidence: item.visibleEvidence,
-                    locationID: locationID
-                ))
+                context.insert(
+                    EquipmentRecord(
+                        id: id,
+                        name: item.name,
+                        confidence: item.confidence,
+                        visibleEvidence: item.visibleEvidence,
+                        locationID: locationID
+                    ))
             }
             // Older builds stored one memory for every device. Once this
             // observation is merged below, hide those legacy fragments.
@@ -199,7 +209,7 @@ final class WorkoutStore {
             let equipmentNames = equipmentAtLocation(locationID)
             upsertMemory(
                 id: "memory-gym-\(locationID)",
-                category: .equipment,
+                category: .venue,
                 text: "\(placeName) · \(equipmentNames.joined(separator: "、"))",
                 sourceSessionID: nil
             )
@@ -282,13 +292,18 @@ final class WorkoutStore {
     }
 
     private func upsertGymLocation(_ snapshot: GymLocationSnapshot) -> String {
-        // ~11 m precision keeps repeat visits to one gym together without
-        // storing a falsely exact, constantly changing GPS identity.
+        // A confirmed POI is the stable identity for a gym across visits; the
+        // ~11 m grid is only the fallback when no POI matched. This keeps one
+        // studio from fragmenting into several records when GPS drifts.
         let id = gymLocationID(snapshot)
         let descriptor = FetchDescriptor<GymLocationRecord>(predicate: #Predicate { $0.id == id })
         if let existing = try? context.fetch(descriptor).first {
             existing.horizontalAccuracy = snapshot.horizontalAccuracy
             if let placeName = snapshot.displayName { existing.placeName = placeName }
+            if let poi = snapshot.poi {
+                existing.poiName = poi.name
+                existing.poiAddress = poi.address
+            }
             existing.lastObservedAt = snapshot.capturedAt
             existing.observationCount += 1
         } else {
@@ -300,7 +315,8 @@ final class WorkoutStore {
     private func equipmentAtLocation(_ locationID: String) -> [String] {
         let records = (try? context.fetch(FetchDescriptor<EquipmentRecord>())) ?? []
         var seen = Set<String>()
-        return records
+        return
+            records
             .filter { $0.lastLocationID == locationID }
             .map(\.name)
             .filter { seen.insert($0).inserted }
@@ -315,7 +331,13 @@ final class WorkoutStore {
         return id
     }
 
+    /// Stable identity: a confirmed POI wins; otherwise snap to an approximately
+    /// 111 m grid so repeat visits group without retaining the precise device fix.
     private func gymLocationID(_ snapshot: GymLocationSnapshot) -> String {
-        String(format: "gym-%.4f-%.4f", snapshot.latitude, snapshot.longitude)
+        if let poi = snapshot.poi {
+            return "gym-poi-\(poi.id)"
+        }
+        let coordinate = snapshot.coarseCoordinate
+        return String(format: "gym-%.3f-%.3f", coordinate.latitude, coordinate.longitude)
     }
 }

@@ -133,29 +133,6 @@ struct WorkoutMemory: Identifiable, Hashable {
     var active: Bool = true
 }
 
-/// A foreground location captured after user authorization. `placeName` is a
-/// compact reverse-geocoded label for the current gym, never a coordinate.
-struct GymLocationSnapshot: Sendable, Hashable {
-    let latitude: Double
-    let longitude: Double
-    let horizontalAccuracy: Double
-    let placeName: String?
-    let capturedAt: Date
-
-    var displayName: String? {
-        placeName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-    }
-}
-
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
-}
-
-struct GymLocationLookup: Sendable, Hashable {
-    let snapshot: GymLocationSnapshot?
-    let elapsedMilliseconds: Int
-}
-
 struct GymVisionCaptureTiming: Sendable, Hashable {
     let startedAt: Date
     let jpegElapsedMilliseconds: Int
@@ -279,5 +256,13 @@ enum Format {
     /// 45 -> "00:45"
     static func clock(_ seconds: Int) -> String {
         String(format: "%02d:%02d", seconds / 60, seconds % 60)
+    }
+
+    /// 1200 -> "约 1.2 公里", 320 -> "约 320 米"
+    static func meters(_ value: Double) -> String {
+        if value >= 1000 {
+            return String(format: "约 %.1f 公里", value / 1000)
+        }
+        return "约 \(Int(value.rounded())) 米"
     }
 }
