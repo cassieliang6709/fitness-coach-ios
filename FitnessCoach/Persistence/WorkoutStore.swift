@@ -116,6 +116,15 @@ final class WorkoutStore {
             .map(\.text)
     }
 
+    /// Structured memories (with stable ids) sent to the gateway so the model
+    /// can cite an existing record when it merges. Same privacy filter as
+    /// `remoteCoachMemories`: no venue or GPS-derived location leaves the device.
+    func memorySnapshotForSummary() -> [MemorySnapshotItem] {
+        activeMemories()
+            .filter { $0.category != .venue && !$0.id.hasPrefix("memory-gym-") }
+            .map { MemorySnapshotItem(id: $0.id, category: $0.category, text: $0.text) }
+    }
+
     /// Upserts by id so a repeated observation updates rather than piles up.
     func upsertMemory(
         id: String,

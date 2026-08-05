@@ -94,7 +94,10 @@ async function handleRequest(request, response) {
       body: JSON.stringify(createKimiMemorySummaryRequest(input)),
     });
     if (!upstream.ok) throw new Error(`Kimi 记忆总结暂时不可用（HTTP ${upstream.status}）`);
-    const result = parseMemorySummaryResponse((await upstream.json()).choices?.[0]?.message?.content);
+    const result = parseMemorySummaryResponse(
+      (await upstream.json()).choices?.[0]?.message?.content,
+      input.existingMemories
+    );
     return sendJson(response, 200, result);
   }
   sendJson(response, 404, { error: 'not_found' });
@@ -189,7 +192,7 @@ function forwardClientFrame(state, frame) {
       type: 'session.update',
       session: {
         modalities: ['text', 'audio'],
-        instructions: buildVancePrompt({ style: session.style, state: session.state, memories: session.memories }),
+        instructions: buildVancePrompt({ style: session.style, state: session.state, memories: session.memories, memoryLayers: session.memoryLayers }),
         voice: voices.has(session.voiceId) ? session.voiceId : 'male-qn-jingying',
         input_audio_format: 'pcm16',
         output_audio_format: 'pcm16',

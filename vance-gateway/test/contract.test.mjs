@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildVancePrompt, VANCE_PROMPT_VERSION } from '../coach-prompt.mjs';
 import { parseGymVisionResponse, validateGymVisionInput } from '../gym-vision.mjs';
-import { parseMemorySummaryResponse, validateMemorySummaryInput } from '../memory-summary.mjs';
+import { parseMemorySummaryResponse, validateMemorySummaryInput, memoryBudget } from '../memory-summary.mjs';
 
 test('Vance prompt includes server-owned context and safety contract', () => {
   const prompt = buildVancePrompt({
@@ -44,13 +44,13 @@ test('gym vision rejects unsupported image data', () => {
 test('memory summary keeps only supported, durable categories with stable ids', () => {
   const result = parseMemorySummaryResponse(JSON.stringify({
     updates: [
-      { category: 'injury', text: '右膝不适，避免跳跃' },
-      { category: 'unknown', text: 'should not persist' },
-      { category: 'injury', text: '右膝不适，避免跳跃' },
+      { operation: 'add', category: 'injury', text: '右膝不适，避免跳跃' },
+      { operation: 'add', category: 'unknown', text: 'should not persist' },
+      { operation: 'add', category: 'injury', text: '右膝不适，避免跳跃' },
     ],
   }));
   assert.equal(result.updates.length, 1);
-  assert.equal(result.updates[0].operation, 'upsert');
+  assert.equal(result.updates[0].operation, 'add');
   assert.match(result.updates[0].id, /^memory-[a-f0-9]{16}$/);
 });
 
@@ -61,4 +61,78 @@ test('memory summary bounds untrusted request content', () => {
   });
   assert.equal(result.transcript.length, 12);
   assert.equal(result.existingMemories.length, 60);
+});
+
+test('memory summary accepts structured existing memories with ids', () => {
+  const result = validateMemorySummaryInput({
+    transcript: ['用户：膝盖养好了'],
+    existingMemories: [
+      { id: 'memory-abc123', category: 'injury', text: '右膝不适' },
+      { id: 'memory-def456', category: 'bogus', text: '偏好' },
+      '纯文本旧格式',
+    ],
+  });
+  assert.equal(result.existingMemories.length, 3);
+  assert.equal(result.existingMemories[0].id, 'memory-abc123');
+  assert.equal(result.existingMemories[1].category, null); // unsupported category dropped
+  assert.equal(result.existingMemories[2].id, null); // legacy string keeps null id
+});
+
+test('update and delete must cite a real existing memory id', () => {
+  const existing = [{ id: 'memory-knee01', category: 'injury', text: '右膝不适' }];
+  const result = parseMemorySummaryResponse(JSON.stringify({
+    updates: [
+      { operation: 'update', category: 'injury', text: '膝盖已恢复', targetId: 'memory-knee01' },
+      { operation: 'delete', category: 'injury', text: '', targetId: 'memory-knee01' },
+      { operation: 'update', category: 'injury', text: '幻觉引用', targetId: 'memory-notreal' },
+      { operation: 'delete', category: 'injury', text: '', targetId: null },
+    ],
+  }), existing);
+  // The hallucinated and id-less references are dropped; the two real ones survive.
+  assert.equal(result.updates.length, 2);
+  assert.equal(result.updates[0].operation, 'update');
+  assert.equal(result.updates[0].targetId, 'memory-knee01');
+  assert.equal(result.updates[1].operation, 'delete');
+});
+
+test('noop and duplicate adds are filtered out', () => {
+  const result = parseMemorySummaryResponse(JSON.stringify({
+    updates: [
+      { operation: 'noop', category: 'preference', text: '今天有点累' },
+      { operation: 'add', category: 'preference', text: '喜欢早上训练' },
+      { operation: 'add', category: 'preference', text: '喜欢早上训练' },
+    ],
+  }));
+  assert.equal(result.updates.length, 1);
+  assert.equal(result.updates[0].operation, 'add');
+});
+
+test('memory budget reports pressure over the ceiling', () => {
+  const calm = memoryBudget([{ text: 'a' }, { text: 'b' }]);
+  assert.equal(calm.count, 2);
+  assert.equal(calm.overBudget, false);
+  const crowded = memoryBudget(Array.from({ length: 50 }, () => ({ text: 'x'.repeat(60) })));
+  assert.equal(crowded.overBudget, true);
+});
+
+test('prompt renders layered memories with safety first', () => {
+  const prompt = buildVancePrompt({
+    style: 'practical',
+    state: { phase: 'strength' },
+    memoryLayers: {
+      injuries: ['右膝不适'],
+      preferences: ['喜欢早上训练'],
+      facts: ['常去望京健身房'],
+    },
+  });
+  assert.match(prompt, /身体限制\/安全（优先遵守）：右膝不适/);
+  assert.match(prompt, /训练偏好：喜欢早上训练/);
+  assert.match(prompt, /其他长期事实：常去望京健身房/);
+  // Safety layer precedes the preference layer in the rendered prompt.
+  assert.ok(prompt.indexOf('身体限制') < prompt.indexOf('训练偏好'));
+});
+
+test('prompt stays backward compatible with a flat memories array', () => {
+  const prompt = buildVancePrompt({ style: 'practical', state: {}, memories: ['膝盖偶尔不适'] });
+  assert.match(prompt, /训练偏好：膝盖偶尔不适/);
 });
