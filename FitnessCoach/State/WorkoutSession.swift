@@ -187,19 +187,27 @@ final class WorkoutSession {
         // Location records stay on-device. Kimi does not need them to decide
         // whether a new preference or injury fact duplicates an old memory.
         thread.memorySummaryProvider = { [weak self] in
-            self?.store.remoteCoachMemories() ?? []
+            self?.store.memorySnapshotForSummary() ?? []
         }
         thread.memoryUpdateHandler = { [weak self] updates in
             guard let self else { return }
             for update in updates {
                 switch update.operation {
-                case .upsert:
+                case .add:
+                    guard let text = update.text else { continue }
                     self.store.upsertMemory(
                         id: "kimi-\(update.id)",
                         category: update.category,
-                        text: update.text,
+                        text: text,
                         sourceSessionID: self.record?.id
                     )
+                case .update:
+                    // The gateway cites the memory's stored id; update in place.
+                    guard let targetId = update.targetId, let text = update.text else { continue }
+                    self.store.updateMemory(id: targetId, category: update.category, text: text)
+                case .delete:
+                    guard let targetId = update.targetId else { continue }
+                    self.store.deactivateMemory(id: targetId)
                 }
             }
         }

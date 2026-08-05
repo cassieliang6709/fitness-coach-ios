@@ -29,8 +29,8 @@ final class CoachThread {
     var contextProvider: (@MainActor () -> CoachContext)?
     /// Active memory chips, sent so the coach knows the user's history.
     var memoryProvider: (@MainActor () -> [String])?
-    /// Existing non-location memories used only for Kimi's dedupe pass.
-    var memorySummaryProvider: (@MainActor () -> [String])?
+    /// Existing non-location memories used only for Kimi's dedupe/merge pass.
+    var memorySummaryProvider: (@MainActor () -> [MemorySnapshotItem])?
     /// Commits sanitized Kimi summary output to the local SwiftData store.
     var memoryUpdateHandler: (@MainActor ([MemorySummary.Update]) -> Void)?
     /// Commits the high-confidence photo facts and optional device location.
@@ -414,7 +414,7 @@ final class CoachThread {
             let memorySummarizer,
             let memoryUpdateHandler
         else { return }
-        let memories = memorySummaryProvider?() ?? memoryProvider?() ?? []
+        let memories = memorySummaryProvider?() ?? [];
         // Keep one current summary worker per coaching thread. A newer user
         // turn supersedes stale context instead of building a request queue.
         memorySummaryWork?.cancel()

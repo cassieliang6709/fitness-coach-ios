@@ -71,20 +71,44 @@ struct GymVisionRecognition: Sendable {
     let clientRequestElapsedMilliseconds: Int
 }
 
-/// A server-sanitized durable memory addition or update.
+/// A server-sanitized durable memory change. The gateway decides whether each
+/// candidate fact is new (`add`), replaces an existing record (`update`), or
+/// invalidates one (`delete`).
 struct MemorySummary: Codable, Sendable {
     struct Update: Codable, Sendable {
         let id: String
         let operation: Operation
         let category: MemoryCategory
-        let text: String
+        let text: String?
+        /// The existing memory this `update`/`delete` operates on. Nil for `add`.
+        let targetId: String?
 
         enum Operation: String, Codable, Sendable {
-            case upsert
+            case add
+            case update
+            case delete
         }
     }
 
     let updates: [Update]
+    /// Gateway-reported memory pressure, so the client can decide when to trim.
+    let budget: Budget?
+
+    struct Budget: Codable, Sendable {
+        let count: Int
+        let chars: Int
+        let maxCount: Int
+        let maxChars: Int
+        let overBudget: Bool
+    }
+}
+
+/// An existing memory sent to the gateway so the model can cite it by id when
+/// merging. Location/venue records are excluded before this is built.
+struct MemorySnapshotItem: Codable, Sendable {
+    let id: String
+    let category: MemoryCategory
+    let text: String
 }
 
 struct GymVisionAPI: Sendable {
@@ -142,7 +166,7 @@ struct GymVisionAPI: Sendable {
 struct MemorySummaryAPI: Sendable {
     let config: VanceGatewayConfig
 
-    func summarize(transcript: [String], existingMemories: [String]) async throws -> MemorySummary {
+    func summarize(transcript: [String], existingMemories: [MemorySnapshotItem]) async throws -> MemorySummary {
         guard let url = config.httpURL(path: "/api/memory-summary") else {
             throw VanceGatewayError.notConfigured
         }
@@ -167,7 +191,7 @@ struct MemorySummaryAPI: Sendable {
 
     private struct Request: Encodable {
         let transcript: [String]
-        let existingMemories: [String]
+        let existingMemories: [MemorySnapshotItem]
     }
 }
 

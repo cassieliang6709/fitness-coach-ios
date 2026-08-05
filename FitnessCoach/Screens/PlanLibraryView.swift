@@ -90,9 +90,14 @@ struct MemoryLibrarySheet: View {
                                 Image(systemName: memory.category.symbol)
                                     .foregroundStyle(Theme.primary)
                                     .frame(width: 20)
-                                Text(memory.text)
-                                    .foregroundStyle(Theme.mainText)
-                                    .multilineTextAlignment(.leading)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(memory.text)
+                                        .foregroundStyle(Theme.mainText)
+                                        .multilineTextAlignment(.leading)
+                                    Text(memorySourceLabel(memory))
+                                        .font(Theme.caption)
+                                        .foregroundStyle(Theme.secondaryText)
+                                }
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.caption.weight(.semibold))
@@ -146,6 +151,20 @@ struct MemoryLibrarySheet: View {
             )
         }
         isShowingEditor = false
+    }
+
+    /// Where a memory came from plus when it last changed, so the user can tell
+    /// a coach-learned fact apart from something they typed or an onboarding seed.
+    private func memorySourceLabel(_ memory: MemoryRecord) -> String {
+        let source: String
+        if memory.id.hasPrefix("manual-") {
+            source = "手动添加"
+        } else if memory.sourceSessionID != nil || memory.id.hasPrefix("kimi-") {
+            source = "训练中学到"
+        } else {
+            source = "初始设置"
+        }
+        return "\(source) · \(memory.updatedAt.formatted(.relative(presentation: .named)))"
     }
 
     private func disable() {

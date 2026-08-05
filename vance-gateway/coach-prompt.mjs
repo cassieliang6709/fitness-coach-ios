@@ -6,9 +6,9 @@ const STYLE = {
   practical: '语气务实，少寒暄，直接给下一步。',
 };
 
-export function buildVancePrompt({ style = 'practical', state, memories = [] } = {}) {
+export function buildVancePrompt({ style = 'practical', state, memories = [], memoryLayers = null } = {}) {
   const safeStyle = STYLE[style] ? style : 'practical';
-  const context = describeContext(state, memories);
+  const context = describeContext(state, memories, memoryLayers);
   return `你是 Vance，一位中文实时健身陪练教练。Prompt 版本：${VANCE_PROMPT_VERSION}。
 
 定位：你热爱训练、友好有感染力，但不夸张、不施压。你会根据用户当下状态给出务实、专业、短而可执行的下一步。相信长期稳定胜过一次练到极限。
@@ -27,7 +27,7 @@ ${context}
 使用清晰自然的普通话，始终输出语音和对应文本。`;
 }
 
-function describeContext(state, memories) {
+function describeContext(state, memories, memoryLayers) {
   const lines = [];
   if (state && typeof state === 'object') {
     if (state.phase) lines.push(`阶段：${clean(state.phase, 40)}`);
@@ -40,9 +40,26 @@ function describeContext(state, memories) {
       : [];
     if (equipment.length) lines.push(`已确认可用器械：${equipment.join('、')}`);
   }
-  const safeMemories = Array.isArray(memories) ? memories.map(item => clean(item, 140)).filter(Boolean).slice(0, 8) : [];
-  if (safeMemories.length) lines.push(`长期偏好/限制：${safeMemories.join('；')}`);
+
+  // Layered memories let the coach weight safety limits above taste. A client
+  // that sends only the legacy flat `memories` array lands in preferences.
+  const layers = normalizeLayers(memories, memoryLayers);
+  if (layers.injuries.length) lines.push(`身体限制/安全（优先遵守）：${layers.injuries.join('；')}`);
+  if (layers.preferences.length) lines.push(`训练偏好：${layers.preferences.join('；')}`);
+  if (layers.facts.length) lines.push(`其他长期事实：${layers.facts.join('；')}`);
   return lines.length ? lines.join('\n') : '暂无额外上下文。';
+}
+
+function normalizeLayers(memories, memoryLayers) {
+  const cap = list => list.map(item => clean(item, 140)).filter(Boolean).slice(0, 8);
+  if (memoryLayers && typeof memoryLayers === 'object') {
+    return {
+      injuries: cap(Array.isArray(memoryLayers.injuries) ? memoryLayers.injuries : []),
+      preferences: cap(Array.isArray(memoryLayers.preferences) ? memoryLayers.preferences : []),
+      facts: cap(Array.isArray(memoryLayers.facts) ? memoryLayers.facts : []),
+    };
+  }
+  return { injuries: [], preferences: cap(Array.isArray(memories) ? memories : []), facts: [] };
 }
 
 function clean(value, limit) {
