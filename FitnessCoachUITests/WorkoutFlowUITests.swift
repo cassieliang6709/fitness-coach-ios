@@ -211,6 +211,30 @@ final class WorkoutFlowUITests: XCTestCase {
 
     // MARK: - Voice UI states and the knee adjustment
 
+    /// Physical-device acceptance for the other service boundary: a new user
+    /// must receive a catalogue-backed plan from Worker + DeepSeek rather than
+    /// an existing device cache or MockData.
+    func testLiveWorkerGeneratesTodayPlan() throws {
+        guard ProcessInfo.processInfo.environment["VANCE_RUN_LIVE_PLAN"] == "1" else {
+            throw XCTSkip("Set VANCE_RUN_LIVE_PLAN=1 with a phone-reachable Worker")
+        }
+
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-live-plan-fixture", "-live", "-install-user-id",
+            "physical-plan-\(UUID().uuidString.lowercased())",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["我的计划"].waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            app.buttons["开始今天的训练"].waitForExistence(timeout: 60),
+            "expected a new Worker + DeepSeek plan on the physical device"
+        )
+        XCTAssertFalse(app.staticTexts["还没有可用计划"].exists)
+        XCTAssertFalse(app.staticTexts["教练服务未配置，暂时无法生成真实计划。"].exists)
+    }
+
     /// Optional live integration harness. A bundled voice clip is decoded and
     /// paced through the microphone WebSocket path; the assistant response must
     /// still come from the running MiniMax Gateway — never MockData.
@@ -287,10 +311,11 @@ final class WorkoutFlowUITests: XCTestCase {
             predicate: NSPredicate(format: "label == %@", "按住说话"),
             object: realtimeStatus
         )
+        let result = XCTWaiter.wait(for: [ready], timeout: 30)
         XCTAssertEqual(
-            XCTWaiter.wait(for: [ready], timeout: 30),
+            result,
             .completed,
-            "Gateway did not finish the WebSocket handshake"
+            "Gateway did not finish the WebSocket handshake; app status: \(realtimeStatus.label)"
         )
     }
 

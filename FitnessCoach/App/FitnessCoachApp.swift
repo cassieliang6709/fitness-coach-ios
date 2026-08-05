@@ -14,10 +14,10 @@ struct FitnessCoachApp: App {
         // chooses a screen; it must not silently turn live coaching into the
         // sample script.
         let arguments = ProcessInfo.processInfo.arguments
-        let usesLiveAudioFixture = Self.usesLiveAudioFixture(arguments)
+        let usesLiveServiceFixture = Self.usesLiveServiceFixture(arguments)
         let usesDemoStore =
             arguments.contains("-uitest") || arguments.contains("-onboarded")
-            || arguments.contains("-demo") || usesLiveAudioFixture
+            || arguments.contains("-demo") || usesLiveServiceFixture
         let container = WorkoutStore.makeContainer(inMemory: usesDemoStore)
         let store = WorkoutStore(context: container.mainContext)
 
@@ -25,7 +25,7 @@ struct FitnessCoachApp: App {
         // writes the profile and the first memory chips. The test/demo flag
         // skips straight past it; a deep link continues to use the real store.
         if arguments.contains("-onboarded") || arguments.contains("-demo")
-            || usesLiveAudioFixture
+            || usesLiveServiceFixture
         {
             store.seedDemoProfileIfNeeded()
         }
@@ -35,12 +35,13 @@ struct FitnessCoachApp: App {
         _session = State(initialValue: WorkoutSession(store: store))
     }
 
-    /// Debug-only harness: a deterministic workout with live network clients,
-    /// used by the bundled-audio integration test. Assistant output is never
-    /// seeded — it must still arrive from the realtime gateway.
-    private static func usesLiveAudioFixture(_ arguments: [String]) -> Bool {
+    /// Debug-only harnesses use an in-memory profile while keeping the real
+    /// Worker/Gateway clients. Neither model output nor a generated plan is
+    /// seeded by this flag.
+    private static func usesLiveServiceFixture(_ arguments: [String]) -> Bool {
         #if DEBUG
         return arguments.contains("-live-audio-fixture")
+            || arguments.contains("-live-plan-fixture")
         #else
         return false
         #endif

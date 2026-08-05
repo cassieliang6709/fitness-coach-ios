@@ -17,6 +17,14 @@ enum InstallIdentity {
     static let demoID = "demo"
 
     static var current: String {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-install-user-id"),
+            arguments.indices.contains(index + 1)
+        {
+            return arguments[index + 1]
+        }
+        #endif
         if ProcessInfo.processInfo.arguments.contains("-uitest") { return demoID }
 
         let defaults = UserDefaults.standard
