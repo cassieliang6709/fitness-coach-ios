@@ -179,14 +179,12 @@ final class WorkoutSession {
         }
         thread.speech = speech
         thread.memoryProvider = { [weak self] in
-            self?.store.activeMemories().map(\.text) ?? []
+            self?.store.remoteCoachMemories() ?? []
         }
         // Location records stay on-device. Kimi does not need them to decide
         // whether a new preference or injury fact duplicates an old memory.
         thread.memorySummaryProvider = { [weak self] in
-            self?.store.activeMemories()
-                .filter { $0.category != .venue }
-                .map(\.text) ?? []
+            self?.store.remoteCoachMemories() ?? []
         }
         thread.memoryUpdateHandler = { [weak self] updates in
             guard let self else { return }

@@ -91,9 +91,10 @@ final class GymLocationRecord {
     var observationCount: Int
 
     init(id: String, snapshot: GymLocationSnapshot) {
+        let coordinate = snapshot.coarseCoordinate
         self.id = id
-        self.latitude = snapshot.latitude
-        self.longitude = snapshot.longitude
+        self.latitude = coordinate.latitude
+        self.longitude = coordinate.longitude
         self.horizontalAccuracy = snapshot.horizontalAccuracy
         self.placeName = snapshot.displayName
         self.poiName = snapshot.poi?.name

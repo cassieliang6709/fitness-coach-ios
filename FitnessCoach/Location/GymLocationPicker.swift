@@ -14,6 +14,7 @@ struct GymLocationPicker: View {
     /// Top POI around the device, auto-highlighted as the default choice.
     @State private var pois: [GymPOI] = []
     @State private var selectedPOI: GymPOI?
+    @State private var selectedCustomCoordinate: CLLocationCoordinate2D?
     @State private var isSearchOpen = false
     @State private var searchText = ""
     @State private var isResolving = true
@@ -63,24 +64,41 @@ struct GymLocationPicker: View {
     // MARK: - Map
 
     private var map: some View {
-        Map(initialPosition: .region(region)) {
-            // Device location pin — the fallback the user can pick directly.
-            Annotation("", coordinate: center) {
-                currentLocationBadge
-            }
+        MapReader { proxy in
+            Map(initialPosition: .region(region)) {
+                // Device location pin — the fallback the user can pick directly.
+                Annotation("", coordinate: center) {
+                    currentLocationBadge
+                }
 
-            ForEach(pois) { poi in
-                Annotation("", coordinate: poi.coordinate) {
-                    poiMarker(for: poi)
-                        .onTapGesture {
-                            selectedPOI = poi
-                        }
+                if let selectedCustomCoordinate {
+                    Annotation("", coordinate: selectedCustomCoordinate) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(Theme.primary)
+                            .shadow(radius: 3)
+                    }
+                }
+
+                ForEach(pois) { poi in
+                    Annotation("", coordinate: poi.coordinate) {
+                        poiMarker(for: poi)
+                            .onTapGesture {
+                                selectedPOI = poi
+                                selectedCustomCoordinate = nil
+                            }
+                    }
                 }
             }
-        }
-        .mapControls {
-            MapCompass()
-            MapScaleView()
+            .onTapGesture { position in
+                guard let coordinate = proxy.convert(position, from: .local) else { return }
+                selectedPOI = nil
+                selectedCustomCoordinate = coordinate
+            }
+            .mapControls {
+                MapCompass()
+                MapScaleView()
+            }
         }
         .overlay(alignment: .top) {
             if isResolving {
@@ -146,6 +164,10 @@ struct GymLocationPicker: View {
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.primary)
                 }
+            } else if selectedCustomCoordinate != nil {
+                Text("已选择自定义地点")
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.secondaryText)
             } else {
                 Text(isResolving ? "正在查找附近健身房…" : "未找到附近的健身房，可确认当前定位。")
                     .font(Theme.caption)
@@ -153,9 +175,9 @@ struct GymLocationPicker: View {
             }
 
             PrimaryButton(
-                title: selectedPOI != nil ? "确认 \(selectedPOI!.name)" : "确认当前定位"
+                title: confirmationTitle
             ) {
-                confirm(selectedPOI)
+                confirm(selectedPOI, customCoordinate: selectedCustomCoordinate)
             }
         }
         .padding(.horizontal, Theme.pagePadding)
@@ -186,6 +208,12 @@ struct GymLocationPicker: View {
         isResolving = false
     }
 
+    private var confirmationTitle: String {
+        if let selectedPOI { return "确认 \(selectedPOI.name)" }
+        if selectedCustomCoordinate != nil { return "确认自定义地点" }
+        return "确认当前定位"
+    }
+
     private func runSearch(_ text: String) {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
@@ -199,12 +227,13 @@ struct GymLocationPicker: View {
             if isSearchOpen {
                 pois = resolved
                 selectedPOI = pois.first
+                selectedCustomCoordinate = nil
             }
             isResolving = false
         }
     }
 
-    private func confirm(_ poi: GymPOI?) {
+    private func confirm(_ poi: GymPOI?, customCoordinate: CLLocationCoordinate2D?) {
         var confirmed = snapshot
         if let poi {
             confirmed = GymLocationSnapshot(
@@ -213,6 +242,15 @@ struct GymLocationPicker: View {
                 horizontalAccuracy: 0,
                 placeName: poi.displayName,
                 poi: poi,
+                capturedAt: snapshot.capturedAt
+            )
+        } else if let customCoordinate {
+            confirmed = GymLocationSnapshot(
+                latitude: customCoordinate.latitude,
+                longitude: customCoordinate.longitude,
+                horizontalAccuracy: snapshot.horizontalAccuracy,
+                placeName: "自定义地点",
+                poi: nil,
                 capturedAt: snapshot.capturedAt
             )
         }

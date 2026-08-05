@@ -81,28 +81,68 @@ struct GymPOIResolver: GymPOIResolving {
             return 1
         }
 
-        return items
+        return
+            items
             .sorted { score($0.0) < score($1.0) || (score($0.0) == score($1.0) && $0.1 < $1.1) }
             .map { item, distance in
                 let placemark = item.placemark
                 let latitude = placemark.coordinate.latitude
                 let longitude = placemark.coordinate.longitude
                 return GymPOI(
-                    id: String(format: "poi-%.4f-%.4f", latitude, longitude),
+                    id: stableIdentity(
+                        for: item,
+                        address: address(for: placemark),
+                        coordinate: placemark.coordinate
+                    ),
                     name: item.name ?? "未命名健身房",
-                    address: [
-                        placemark.subLocality,
-                        placemark.thoroughfare,
-                        placemark.subThoroughfare,
-                    ]
-                    .compactMap { $0 }
-                    .joined(separator: " "),
+                    address: address(for: placemark),
                     category: item.pointOfInterestCategory?.rawValue,
                     latitude: latitude,
                     longitude: longitude,
                     distanceFromDevice: distance
                 )
             }
+    }
+
+    private func address(for placemark: MKPlacemark) -> String {
+        [placemark.subLocality, placemark.thoroughfare, placemark.subThoroughfare]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    /// Prefer MapKit's own venue identity where it is available. The normalized
+    /// name/address fallback is stable across GPS fixes, unlike the old 11 m
+    /// coordinate rounding. Full coordinates are only an empty-metadata fallback
+    /// and are not persisted as the user's device location.
+    private func stableIdentity(
+        for item: MKMapItem,
+        address: String,
+        coordinate: CLLocationCoordinate2D
+    ) -> String {
+        if #available(iOS 18.0, *), let identifier = item.identifier?.rawValue {
+            return "mapkit-\(identifier)"
+        }
+
+        let normalized = [item.name, address]
+            .compactMap {
+                $0?.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            }
+            .joined(separator: "|")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            return String(format: "coordinate-%.6f-%.6f", coordinate.latitude, coordinate.longitude)
+        }
+        return "venue-\(fnv1a64(normalized.utf8))"
+    }
+
+    private func fnv1a64(_ bytes: String.UTF8View) -> String {
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in bytes {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        return String(hash, radix: 16)
     }
 }
 
@@ -119,6 +159,16 @@ struct GymLocationSnapshot: Sendable, Hashable, Identifiable {
 
     var displayName: String? {
         (poi?.displayName ?? placeName)?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The database only needs an approximate map point. Keeping the original
+    /// coordinate in this transient snapshot lets the picker render accurately,
+    /// while storage uses an approximately 111 m grid.
+    var coarseCoordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(
+            latitude: (latitude * 1_000).rounded() / 1_000,
+            longitude: (longitude * 1_000).rounded() / 1_000
+        )
     }
 }
 
@@ -138,6 +188,10 @@ final class GymLocationService: NSObject {
 
     /// Accuracy threshold that's good enough to stop sampling early.
     private static let goodAccuracy: CLLocationAccuracy = 40
+    /// A raw fallback must be good enough for a user to recognize the map point.
+    /// POI confirmation is preferred; this bound prevents poor indoor/cached
+    /// fixes from becoming a long-lived venue record.
+    private static let maximumFallbackAccuracy: CLLocationAccuracy = 100
     private static let maxSamples = 3
     private static let maxWait: Duration = .seconds(4)
 
@@ -145,6 +199,7 @@ final class GymLocationService: NSObject {
     private var authorizationContinuation: CheckedContinuation<Bool, Never>?
     private var locationContinuation: CheckedContinuation<GymLocationSnapshot?, Never>?
     private var samples: [CLLocation] = []
+    private var requestStartedAt: Date?
 
     private override init() {
         super.init()
@@ -179,6 +234,7 @@ final class GymLocationService: NSObject {
         await withCheckedContinuation { continuation in
             locationContinuation = continuation
             samples.removeAll()
+            requestStartedAt = .now
             manager.startUpdatingLocation()
             Task { [weak self] in
                 try? await Task.sleep(for: Self.maxWait)
@@ -190,34 +246,41 @@ final class GymLocationService: NSObject {
     private func finishConvergence() {
         guard let continuation = locationContinuation else { return }
         locationContinuation = nil
+        requestStartedAt = nil
         manager.stopUpdatingLocation()
         // Keep the tightest fix seen, not the last one — the first frames from
         // a cold GPS start can be hundreds of meters off.
         guard let best = samples.min(by: { $0.horizontalAccuracy < $1.horizontalAccuracy }),
-              best.horizontalAccuracy >= 0
+            best.horizontalAccuracy >= 0,
+            best.horizontalAccuracy <= Self.maximumFallbackAccuracy
         else {
             continuation.resume(returning: nil)
             return
         }
-        continuation.resume(returning: GymLocationSnapshot(
-            latitude: best.coordinate.latitude,
-            longitude: best.coordinate.longitude,
-            horizontalAccuracy: best.horizontalAccuracy,
-            placeName: nil,
-            poi: nil,
-            capturedAt: .now
-        ))
+        continuation.resume(
+            returning: GymLocationSnapshot(
+                latitude: best.coordinate.latitude,
+                longitude: best.coordinate.longitude,
+                horizontalAccuracy: best.horizontalAccuracy,
+                placeName: nil,
+                poi: nil,
+                capturedAt: .now
+            ))
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         guard let continuation = authorizationContinuation else { return }
         authorizationContinuation = nil
         let status = manager.authorizationStatus
-        continuation.resume(returning: status == .authorizedAlways || status == .authorizedWhenInUse)
+        continuation.resume(
+            returning: status == .authorizedAlways || status == .authorizedWhenInUse)
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        let valid = locations.filter { $0.horizontalAccuracy >= 0 }
+        let valid = locations.filter {
+            $0.horizontalAccuracy >= 0
+                && $0.timestamp >= (requestStartedAt ?? .distantFuture)
+        }
         guard let last = valid.last else { return }
         samples.append(last)
 
@@ -231,6 +294,8 @@ final class GymLocationService: NSObject {
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         locationContinuation?.resume(returning: nil)
         locationContinuation = nil
+        requestStartedAt = nil
+        manager.stopUpdatingLocation()
     }
 }
 

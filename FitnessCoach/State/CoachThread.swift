@@ -69,9 +69,9 @@ final class CoachThread {
     /// view's body presents the picker; `confirmLocation`/`dismissLocationPicker`
     /// clear it so the sheet never re-presents after a swipe-down.
     private(set) var pendingLocationSnapshot: GymLocationSnapshot?
-    /// The last successful recognition, kept so a later confirmed location can
-    /// be attached to the same equipment observation.
-    private var lastVisionResult: GymVisionResult?
+    /// Each pending location carries the recognition it belongs to. A failed
+    /// later capture must never attach its location to an earlier photo.
+    private var pendingVisionResult: GymVisionResult?
 
     var isLive: Bool { api != nil || realtime != nil }
 
@@ -298,15 +298,17 @@ final class CoachThread {
         guard pendingLocationSnapshot != nil else { return }
         pendingLocationSnapshot = nil
         gymLocationHandler?(snapshot)
-        if let result = lastVisionResult {
+        if let result = pendingVisionResult {
             gymObservationHandler?(result, snapshot)
         }
+        pendingVisionResult = nil
     }
 
     /// Dismiss the location picker without persisting. The photo's equipment is
     /// still recognized; only the location is skipped.
     func dismissLocationPicker() {
         pendingLocationSnapshot = nil
+        pendingVisionResult = nil
     }
 
     /// Keeps photo recognition as a turn in the existing conversation. It
@@ -321,6 +323,8 @@ final class CoachThread {
     ) async {
         guard !isVisionRecognizing, let vision, let context = currentContext() else { return }
         isVisionRecognizing = true
+        pendingLocationSnapshot = nil
+        pendingVisionResult = nil
         let photoMessage = ChatMessage(role: .user, content: "📷 已上传健身房照片，正在识别器械与定位…")
         append(photoMessage)
 
@@ -336,7 +340,6 @@ final class CoachThread {
             let result = recognition.result
             update(id: photoMessage.id, content: "📷 已上传健身房照片")
             recognizedEquipment = result.equipment.map(\.name)
-            lastVisionResult = result
 
             let reply: String
             if recognizedEquipment.isEmpty {
@@ -352,6 +355,7 @@ final class CoachThread {
             let locationLookup = await locationTask.value
             if let snapshot = locationLookup.snapshot {
                 pendingLocationSnapshot = snapshot
+                pendingVisionResult = result
             }
 
             let timing = GymVisionTiming(
@@ -366,10 +370,13 @@ final class CoachThread {
             )
             gymVisionTimingHandler?(timing)
         } catch {
+            pendingVisionResult = nil
             update(id: photoMessage.id, content: "📷 器械照片未识别")
             let message = (error as? LocalizedError)?.errorDescription ?? "器械识别暂不可用"
             append(.init(role: .assistant, content: message))
-            let failedRequestElapsedMilliseconds = Int(Date().timeIntervalSince(captureTiming.startedAt) * 1_000) - captureTiming.jpegElapsedMilliseconds
+            let failedRequestElapsedMilliseconds =
+                Int(Date().timeIntervalSince(captureTiming.startedAt) * 1_000)
+                - captureTiming.jpegElapsedMilliseconds
             let locationLookup = await locationTask.value
             if let snapshot = locationLookup.snapshot {
                 pendingLocationSnapshot = snapshot
