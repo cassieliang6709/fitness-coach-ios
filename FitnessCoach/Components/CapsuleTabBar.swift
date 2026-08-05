@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// The app's two homes: talk to the coach, or look at the plan and what you
-/// actually finished.
+/// The app's three homes: talk to the coach, look at the plan, or learn the
+/// movement library one card at a time.
 enum HomeTab: String, CaseIterable, Identifiable, Hashable {
     case chat
     case plan
+    case learn
 
     var id: String { rawValue }
 
@@ -12,6 +13,7 @@ enum HomeTab: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .chat: return "对话"
         case .plan: return "我的计划"
+        case .learn: return "抽动作"
         }
     }
 
@@ -19,6 +21,7 @@ enum HomeTab: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .chat: return "bubble.left.and.bubble.right.fill"
         case .plan: return "checklist"
+        case .learn: return "rectangle.stack.fill"
         }
     }
 }
@@ -67,7 +70,7 @@ struct CapsuleTabBar: View {
                 .font(.system(size: 15, weight: .semibold))
         }
         .foregroundStyle(tint)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 14)
         .frame(height: Theme.tapTarget)
         .background {
             if active {

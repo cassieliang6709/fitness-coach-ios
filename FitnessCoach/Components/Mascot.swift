@@ -43,19 +43,40 @@ struct Mascot: View {
 /// preserving the existing pose library as a complete fallback for the rest
 /// of the 50-movement catalog.
 struct ExerciseArtwork: View {
-    let exercise: ExerciseDefinition
+    let exerciseID: String
+    let name: String
+    let fallbackPose: MascotPose
     var size: CGFloat
 
+    init(exercise: ExerciseDefinition, size: CGFloat) {
+        exerciseID = exercise.id
+        name = exercise.name
+        fallbackPose = exercise.mascotPose
+        self.size = size
+    }
+
+    init(
+        exerciseID: String,
+        name: String,
+        fallbackPose: MascotPose = .dumbbell,
+        size: CGFloat
+    ) {
+        self.exerciseID = exerciseID
+        self.name = name
+        self.fallbackPose = fallbackPose
+        self.size = size
+    }
+
     var body: some View {
-        if let artwork = UIImage(named: exercise.animationAssetName) {
+        if let artwork = UIImage(named: "exercise-\(exerciseID)") {
             Image(uiImage: artwork)
                 .resizable()
                 .scaledToFit()
                 .frame(width: size, height: size)
-                .accessibilityLabel("\(exercise.name)动作示意图")
-                .accessibilityIdentifier("exercise-specific-artwork-\(exercise.id)")
+                .accessibilityLabel("\(name)动作示意图")
+                .accessibilityIdentifier("exercise-specific-artwork-\(exerciseID)")
         } else {
-            Mascot(pose: exercise.mascotPose, size: size)
+            Mascot(pose: fallbackPose, size: size)
         }
     }
 }

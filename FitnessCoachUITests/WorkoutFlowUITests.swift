@@ -90,6 +90,16 @@ final class WorkoutFlowUITests: XCTestCase {
         add(screenshot)
     }
 
+    func testGeneratedExerciseArtworkAppearsInDetail() {
+        let app = launch(route: "/exercises/reverse-lunge")
+
+        XCTAssertTrue(app.staticTexts["后撤弓步"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.images["exercise-specific-artwork-reverse-lunge"]
+                .waitForExistence(timeout: 3)
+        )
+    }
+
     // MARK: - Welcome
 
     /// A new user answers four questions, and every answer is a memory chip on
@@ -168,6 +178,38 @@ final class WorkoutFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["本周训练"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["AI 记住的事"].exists)
         XCTAssertTrue(app.buttons["开始今天的训练"].exists)
+    }
+
+    func testExerciseLearningTabSwipesThroughCatalog() {
+        let app = launch()
+
+        app.buttons["抽动作"].waitAndTap()
+        XCTAssertTrue(app.staticTexts["动作抽卡"].waitForExistence(timeout: 3))
+        app.buttons["动作库"].waitAndTap()
+        XCTAssertTrue(app.staticTexts["第 1 / 50 个"].exists)
+        XCTAssertTrue(app.staticTexts["动作要点"].exists)
+        XCTAssertTrue(app.staticTexts["注意事项"].exists)
+
+        app.swipeLeft()
+        XCTAssertTrue(app.staticTexts["第 2 / 50 个"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["动作要点"].exists)
+        XCTAssertTrue(app.staticTexts["注意事项"].exists)
+    }
+
+    func testDrawsThreeExercisesAndStartsCoaching() {
+        let app = launch()
+
+        app.buttons["抽动作"].waitAndTap()
+        XCTAssertTrue(app.staticTexts["今天的流程"].waitForExistence(timeout: 3))
+
+        for _ in 0..<3 {
+            app.buttons["上滑加入"].waitAndTap()
+        }
+
+        XCTAssertTrue(app.staticTexts["3 / 3–6"].waitForExistence(timeout: 3))
+        app.buttons["用这 3 个动作开始"].waitAndTap()
+        XCTAssertTrue(app.staticTexts["力量陪练"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["动作 1 / 2"].exists)
     }
 
     // MARK: - Routing

@@ -58,6 +58,7 @@
 		DE9E82F5309F30470B01F8D5 /* ExerciseLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C4E4CDD723E24CEBCA29B3B /* ExerciseLibraryView.swift */; };
 		E1571016F6252030F3FB0B33 /* rive-skills-demo.riv in Resources */ = {isa = PBXBuildFile; fileRef = 0B3A3C2DB991CECEE14A022E /* rive-skills-demo.riv */; };
 		E69A458744AAB90522803E6C /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8560F3CD69082762918E9ED4 /* ReviewView.swift */; };
+		EBDF37B33701C529762DF6FB /* ExerciseDrawTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F6A78DE2AC95402837338E0 /* ExerciseDrawTab.swift */; };
 		ED333BC0DEF5B510E3D53110 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E2693C4FF48A349E00D0428 /* RootView.swift */; };
 		ED85744B4B2E2297C62165C1 /* ExerciseCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 432CACC864D0D08533A46F15 /* ExerciseCatalog.swift */; };
 		EE79989F6077699BC025ED5A /* RiveLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3574E651A1A2E3BD1B4CB98F /* RiveLabView.swift */; };
@@ -99,6 +100,7 @@
 		36AF4FE9E68D3BFCE89DBD51 /* PlanCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCache.swift; sourceTree = "<group>"; };
 		3B3D3CB85BC74FF119A7E63B /* CoachLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachLog.swift; sourceTree = "<group>"; };
 		3F37A793A9B76091E40B4BC4 /* TrainingStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingStats.swift; sourceTree = "<group>"; };
+		3F6A78DE2AC95402837338E0 /* ExerciseDrawTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseDrawTab.swift; sourceTree = "<group>"; };
 		432CACC864D0D08533A46F15 /* ExerciseCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseCatalog.swift; sourceTree = "<group>"; };
 		459216042D2D79EAC02C1F79 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		465870AD592B2CA5E5C064BE /* LICENSE-RIVE-IOS.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "LICENSE-RIVE-IOS.txt"; sourceTree = "<group>"; };
@@ -142,7 +144,7 @@
 		E978E9CEC3D2D0FF70DDD8EF /* WorkoutSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSession.swift; sourceTree = "<group>"; };
 		F181001AD622C3599406E4F1 /* MobileAppShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAppShell.swift; sourceTree = "<group>"; };
 		FB22B9F7B6C288203F121427 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		"TEMP_10CD513C-E61E-47ED-BDE3-2F7CE5A3FD8B" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		"TEMP_AF51B633-0BE8-419A-883F-505EDE633CB3" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -180,6 +182,7 @@
 			children = (
 				4C00A20E3FE5CA88E74CD4EA /* CardioCoachView.swift */,
 				46F5683CD743FE2FDEC6881E /* ExerciseDetailView.swift */,
+				3F6A78DE2AC95402837338E0 /* ExerciseDrawTab.swift */,
 				9C4E4CDD723E24CEBCA29B3B /* ExerciseLibraryView.swift */,
 				459216042D2D79EAC02C1F79 /* HomeView.swift */,
 				0EE6F9CFAC97BDD6AE7500AA /* LegDayDetailView.swift */,
@@ -337,10 +340,10 @@
 			path = DesignSystem;
 			sourceTree = "<group>";
 		};
-		"TEMP_BB78C023-FF76-49C7-8362-81D00DE08269" /* fitness_plan */ = {
+		"TEMP_DB63968B-ADEB-48C3-90E7-891EE2307F36" /* fitness_plan */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_10CD513C-E61E-47ED-BDE3-2F7CE5A3FD8B" /* Secrets.xcconfig */,
+				"TEMP_AF51B633-0BE8-419A-883F-505EDE633CB3" /* Secrets.xcconfig */,
 			);
 			path = fitness_plan;
 			sourceTree = "<group>";
@@ -462,6 +465,7 @@
 				ED85744B4B2E2297C62165C1 /* ExerciseCatalog.swift in Sources */,
 				FAFC298F1430699ADEBF379B /* ExerciseCatalogWire.swift in Sources */,
 				DE7BC2366117279DE34DEE8F /* ExerciseDetailView.swift in Sources */,
+				EBDF37B33701C529762DF6FB /* ExerciseDrawTab.swift in Sources */,
 				DE9E82F5309F30470B01F8D5 /* ExerciseLibraryView.swift in Sources */,
 				94D47636CF2255B287C09EF0 /* ExerciseList.swift in Sources */,
 				A27D4B2E24610CACF07D2A42 /* FitnessCoachApp.swift in Sources */,
@@ -524,7 +528,7 @@
 /* Begin XCBuildConfiguration section */
 		0A5C1E68088CAA6BC11794C2 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_10CD513C-E61E-47ED-BDE3-2F7CE5A3FD8B" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_AF51B633-0BE8-419A-883F-505EDE633CB3" /* Secrets.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGNING_ALLOWED = NO;
@@ -544,7 +548,7 @@
 		};
 		382A8157C0314B540CAE4CDD /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_10CD513C-E61E-47ED-BDE3-2F7CE5A3FD8B" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_AF51B633-0BE8-419A-883F-505EDE633CB3" /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -631,7 +635,7 @@
 		};
 		8DD3C532179EBF0A5669FBA8 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_10CD513C-E61E-47ED-BDE3-2F7CE5A3FD8B" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_AF51B633-0BE8-419A-883F-505EDE633CB3" /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -655,7 +659,7 @@
 		};
 		A1C0B32022452E30557BDAF4 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_10CD513C-E61E-47ED-BDE3-2F7CE5A3FD8B" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_AF51B633-0BE8-419A-883F-505EDE633CB3" /* Secrets.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGNING_ALLOWED = NO;

@@ -295,6 +295,77 @@ final class WorkoutSession {
         exerciseCatalog.first { $0.id == id }
     }
 
+    /// Turns the user's 3–6 accepted cards into the same plan consumed by the
+    /// existing hands-free coaching flow. This keeps drawing and training as
+    /// one real loop rather than a preview-only interaction.
+    @discardableResult
+    func configureDrawnWorkout(_ definitions: [ExerciseDefinition]) -> Bool {
+        guard phase == .planning, (3...6).contains(definitions.count) else { return false }
+
+        let strength = definitions
+            .filter { $0.category != .cardio }
+            .map(Self.workoutExercise)
+        guard !strength.isEmpty else { return false }
+
+        var sections = [
+            PlanSection(
+                id: "drawn-strength",
+                kind: .strength,
+                duration: "按完成速度",
+                subtitle: "你刚刚抽中的动作",
+                exercises: strength
+            )
+        ]
+
+        if let cardio = definitions.first(where: { $0.category == .cardio }) {
+            sections.append(
+                PlanSection(
+                    id: "drawn-cardio",
+                    kind: .cardio,
+                    duration: cardio.prescription,
+                    subtitle: cardio.name,
+                    exercises: [Self.workoutExercise(cardio)]
+                )
+            )
+        }
+
+        plan = WorkoutPlan(
+            id: "drawn-\(UUID().uuidString)",
+            title: "今日抽卡训练",
+            tags: ["\(definitions.count) 个动作", "现场器械匹配"],
+            symbol: "rectangle.stack.fill",
+            sections: sections
+        )
+        hasGeneratedPlan = true
+        exerciseIndex = 0
+        currentSet = 1
+        completedSets = []
+        weightOverrides = [:]
+        swappedExercises = [:]
+        return true
+    }
+
+    private static func workoutExercise(_ definition: ExerciseDefinition) -> Exercise {
+        let parts = definition.prescription.components(separatedBy: "×")
+        let sets = parts.first.flatMap { part in
+            Int(part.filter(\.isNumber))
+        } ?? (definition.category == .cardio ? 1 : 3)
+        let reps = parts.count > 1
+            ? parts.dropFirst().joined(separator: "×").trimmingCharacters(in: .whitespaces)
+            : definition.prescription
+
+        return Exercise(
+            id: definition.id,
+            name: definition.name,
+            sets: sets,
+            reps: reps,
+            sideBased: definition.prescription.contains("侧"),
+            bodyPart: definition.muscleLabel,
+            equipment: definition.equipmentLabel,
+            coachingTips: definition.coachingTips
+        )
+    }
+
     /// Asks the coach for a different plan; used by the plan library's explicit
     /// "换一份" action.
     func regeneratePlan() {
