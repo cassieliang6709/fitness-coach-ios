@@ -16,7 +16,9 @@ const config :Workerd.Config = (
 );
 
 const mainWorker :Workerd.Worker = (
-  serviceWorkerScript = embed "dist/index.js",
+  modules = [
+    (name = "index.js", esModule = embed "dist/index.js"),
+  ],
   compatibilityDate = "2025-11-01",
   compatibilityFlags = ["nodejs_compat"],
 );
