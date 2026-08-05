@@ -24,10 +24,35 @@ struct CoachAPI: Sendable {
 
     /// The scheme lives here rather than in the xcconfig — "//" starts a
     /// comment in xcconfig files and would silently truncate the value.
-    private func url(path: String) -> URL? {
-        var components = URLComponents(string: "https://\(host)\(path)")
-        components?.queryItems = [URLQueryItem(name: "user", value: InstallIdentity.current)]
+    private func url(path: String, queryItems: [URLQueryItem] = []) -> URL? {
+        let scheme = isLocalHost(host) ? "http" : "https"
+        var components = URLComponents(string: "\(scheme)://\(host)\(path)")
+        components?.queryItems = [
+            URLQueryItem(name: "user", value: InstallIdentity.current)
+        ] + queryItems
         return components?.url
+    }
+
+    private func isLocalHost(_ host: String) -> Bool {
+        let name: String
+        if host.hasPrefix("["), let closingBracket = host.firstIndex(of: "]") {
+            name = String(host[host.index(after: host.startIndex)..<closingBracket])
+        } else {
+            name = host.split(separator: ":").first.map(String.init) ?? host
+        }
+        if name == "localhost" || name == "127.0.0.1" || name == "::1"
+            || name.hasSuffix(".local")
+        { return true }
+        let lowercaseName = name.lowercased()
+        if lowercaseName.hasPrefix("fc") || lowercaseName.hasPrefix("fd")
+            || lowercaseName.hasPrefix("fe80:")
+        { return true }
+        if name.hasPrefix("192.168.") || name.hasPrefix("10.") { return true }
+        if name.hasPrefix("172.") {
+            let second = name.split(separator: ".").dropFirst().first.flatMap { Int($0) } ?? 0
+            return (16...31).contains(second)
+        }
+        return false
     }
 
     private var turnURL: URL? { url(path: "/coach/turn") }
@@ -35,14 +60,13 @@ struct CoachAPI: Sendable {
     private var speechURL: URL? { url(path: "/speech") }
 
     private func catalogURL(limit: Int, offset: Int) -> URL? {
-        guard var components = URLComponents(string: "https://\(host)/exercises") else {
-            return nil
-        }
-        components.queryItems = [
-            URLQueryItem(name: "limit", value: String(limit)),
-            URLQueryItem(name: "offset", value: String(offset)),
-        ]
-        return components.url
+        url(
+            path: "/exercises",
+            queryItems: [
+                URLQueryItem(name: "limit", value: String(limit)),
+                URLQueryItem(name: "offset", value: String(offset)),
+            ]
+        )
     }
 
     func stream(_ request: CoachTurnRequest) -> AsyncThrowingStream<CoachEvent, Error> {

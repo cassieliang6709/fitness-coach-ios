@@ -1,7 +1,6 @@
 import AVFoundation
 import Foundation
 import Observation
-import Speech
 
 /// Live voice conversation with MiniMax Realtime, through the Coach Gateway.
 ///
@@ -51,12 +50,22 @@ final class RealtimeSession {
 
     private(set) var status: Status = .idle
     private(set) var messages: [RealtimeMessage] = []
+    /// Capture can be unavailable in a Simulator even while the WebSocket,
+    /// typed turns and model audio are healthy. Keep that distinct from a
+    /// failed realtime connection so text remains usable for local testing.
+    private(set) var microphoneIssue: String?
     /// Round-trip from releasing the button to the first audio byte. The whole
     /// point of the realtime path is that this number is small, so it is on
     /// screen rather than buried in the gateway's timing log.
     private(set) var lastLatencyMs: Int?
 
     let voice = RealtimeWire.defaultVoice
+
+    private var coachingStyle: AIStyle = .practical
+    private var coachingState = CoachContext(
+        phase: "planning", exercise: "尚未生成计划", prescription: "按用户记忆生成"
+    )
+    private var coachingMemories: [String] = []
 
     private let audio = RealtimeAudioEngine()
     private let conversationId = UUID().uuidString.lowercased()
@@ -82,6 +91,11 @@ final class RealtimeSession {
     private var reconnectAttempts = 0
     private let maximumReconnectAttempts = 3
     private var reconnectTask: Task<Void, Never>?
+    private var connectionWatchdog: Task<Void, Never>?
+    private var isRequestingMicrophoneAccess = false
+    #if DEBUG
+    private var audioInjectionTask: Task<Void, Never>?
+    #endif
 
     /// The gateway explains *why* upstream failed in an `error` frame and then
     /// drops the socket. Kept so the close, which carries no detail, reports
@@ -90,10 +104,21 @@ final class RealtimeSession {
 
     // MARK: - Connection
 
+    /// Supplies the live workout snapshot before the socket opens. The
+    /// gateway turns this into MiniMax's server-owned Vance instructions.
+    func configure(style: AIStyle, state: CoachContext, memories: [String]) {
+        coachingStyle = style
+        coachingState = state
+        coachingMemories = memories
+        if socket != nil {
+            sendSessionConfiguration()
+        }
+    }
+
     func connect() {
         guard !status.isConnected, status != .connecting else { return }
 
-        guard let url = Self.gatewayURL(conversationId: conversationId) else {
+        guard let request = Self.gatewayRequest(conversationId: conversationId) else {
             status = .failed("网关地址未配置")
             return
         }
@@ -101,15 +126,6 @@ final class RealtimeSession {
         status = .connecting
 
         Task {
-            guard await requestMicrophoneAccess() else {
-                status = .failed("麦克风权限未开启")
-                return
-            }
-            guard await requestSpeechRecognitionAccess() else {
-                status = .failed("语音识别权限未开启")
-                return
-            }
-
             do {
                 try audio.start()
             } catch {
@@ -117,13 +133,13 @@ final class RealtimeSession {
                 return
             }
 
-            let task = URLSession.shared.webSocketTask(with: url)
+            let task = URLSession.shared.webSocketTask(with: request)
             socket = task
             task.resume()
 
-            send(RealtimeWire.sessionUpdate(voice: voice))
+            sendSessionConfiguration()
             startReceiveLoop(on: task)
-            status = .ready
+            startConnectionWatchdog()
         }
     }
 
@@ -133,12 +149,19 @@ final class RealtimeSession {
         reconnectTask?.cancel()
         reconnectTask = nil
         reconnectAttempts = 0
+        isRequestingMicrophoneAccess = false
         teardown()
         status = .idle
     }
 
     /// Drops the socket and audio without touching `status` or the retry budget.
     private func teardown() {
+        connectionWatchdog?.cancel()
+        connectionWatchdog = nil
+        #if DEBUG
+        audioInjectionTask?.cancel()
+        audioInjectionTask = nil
+        #endif
         receiveLoop?.cancel()
         receiveLoop = nil
         playbackWatch?.cancel()
@@ -149,6 +172,18 @@ final class RealtimeSession {
         pendingChunks = 0
         speechStartedAt = nil
         closeOpenUserTranscript()
+    }
+
+    /// A stalled handshake produces no receive-loop error on some hotspot and
+    /// tunnel combinations. Convert that silent stall into the same bounded
+    /// reconnect path used for an explicit disconnect.
+    private func startConnectionWatchdog() {
+        connectionWatchdog?.cancel()
+        connectionWatchdog = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(8))
+            guard let self, !Task.isCancelled, status == .connecting else { return }
+            reconnect(reason: "网关连接超时")
+        }
     }
 
     /// A failed upstream turn cannot be resumed — MiniMax rejects further
@@ -188,12 +223,30 @@ final class RealtimeSession {
     // MARK: - Talking
 
     func beginSpeaking() {
+        guard (status == .ready || status == .speaking), !isRequestingMicrophoneAccess else { return }
+        isRequestingMicrophoneAccess = true
+
+        Task { [weak self] in
+            guard let self else { return }
+            guard await requestMicrophoneAccess() else {
+                isRequestingMicrophoneAccess = false
+                guard status != .idle else { return }
+                microphoneIssue = "请允许麦克风后再按住说话"
+                return
+            }
+            isRequestingMicrophoneAccess = false
+            startSpeaking()
+        }
+    }
+
+    private func startSpeaking() {
         guard status == .ready || status == .speaking else { return }
 
         // Barge-in: whatever the coach is saying stops the instant the user
         // presses, and its audio is dropped rather than resumed afterwards.
         audio.stopPlayback()
         playbackWatch?.cancel()
+        playbackWatch = nil
         closeOpenCoachMessage()
 
         pendingChunks = 0
@@ -216,9 +269,16 @@ final class RealtimeSession {
                         self?.updateUserTranscript(transcript, isFinal: isFinal)
                     }
                 })
+            microphoneIssue = nil
         } catch {
-            teardown()
-            status = .failed(error.localizedDescription)
+            #if targetEnvironment(simulator)
+            microphoneIssue = "模拟器没有可用麦克风输入；可先用文字测试实时对话。"
+            #else
+            microphoneIssue = error.localizedDescription
+            #endif
+            // Do not close the healthy realtime socket: text messages still
+            // exercise the same MiniMax conversation and playback path.
+            status = .ready
             return
         }
         send(RealtimeWire.audioClear)
@@ -271,6 +331,56 @@ final class RealtimeSession {
         status = .thinking
     }
 
+    #if DEBUG
+    /// Replays a bundled voice fixture at human speed through the same append,
+    /// commit and response path as the microphone. Only the PCM source differs;
+    /// Gateway and MiniMax behavior remain fully live.
+    func injectTestAudio(resource: String) {
+        guard status.isConnected else { return }
+        guard let url = Bundle.main.url(forResource: resource, withExtension: "m4a") else {
+            microphoneIssue = "找不到测试语音：\(resource).m4a"
+            return
+        }
+        guard let pcm = RealtimeAudioEngine.decodeTestAudio(at: url), !pcm.isEmpty else {
+            microphoneIssue = "测试语音解码失败：\(resource).m4a"
+            return
+        }
+
+        audioInjectionTask?.cancel()
+        audio.stopPlayback()
+        playbackWatch?.cancel()
+        playbackWatch = nil
+        closeOpenCoachMessage()
+        closeOpenUserTranscript()
+        localTranscriptMessageId = nil
+        pendingChunks = 0
+        speechStartedAt = .now
+        microphoneIssue = nil
+        status = .listening
+        send(RealtimeWire.audioClear)
+        send(RealtimeWire.vad(stage: "enabled"))
+
+        // 250 ms at 24 kHz, mono Int16. This is still paced at the recording's
+        // real duration, while avoiding dozens of main-actor WebSocket sends
+        // competing with XCTest accessibility snapshots on a physical phone.
+        let chunkDuration = Duration.milliseconds(250)
+        let chunkBytes = 6_000 * MemoryLayout<Int16>.size
+        audioInjectionTask = Task { [weak self] in
+            guard let self else { return }
+            var offset = 0
+            while offset < pcm.count, !Task.isCancelled {
+                let end = min(offset + chunkBytes, pcm.count)
+                appendAudio(pcm.subdata(in: offset..<end))
+                offset = end
+                try? await Task.sleep(for: chunkDuration)
+            }
+            guard !Task.isCancelled else { return }
+            audioInjectionTask = nil
+            endSpeaking()
+        }
+    }
+    #endif
+
     private func appendAudio(_ chunk: Data) {
         guard status == .listening else { return }
         pendingChunks += 1
@@ -285,6 +395,17 @@ final class RealtimeSession {
             // Send failures surface as a receive-loop error a moment later,
             // which is the one place reconnection is handled.
         }
+    }
+
+    private func sendSessionConfiguration() {
+        send(
+            RealtimeWire.sessionUpdate(
+                voice: voice,
+                style: coachingStyle,
+                state: coachingState,
+                memories: coachingMemories
+            )
+        )
     }
 
     private func startReceiveLoop(on task: URLSessionWebSocketTask) {
@@ -303,7 +424,9 @@ final class RealtimeSession {
                     }
                 } catch {
                     guard let self, !Task.isCancelled else { return }
-                    reconnect(reason: lastUpstreamError ?? "连接已断开，正在重连…")
+                    let reason = lastUpstreamError
+                        ?? "连接已断开：\(error.localizedDescription)"
+                    reconnect(reason: reason)
                     return
                 }
             }
@@ -320,6 +443,16 @@ final class RealtimeSession {
         if event.type != "error" {
             reconnectAttempts = 0
             lastUpstreamError = nil
+            // `resume()` only starts the handshake; it does not mean the
+            // socket has reached the Gateway.  Waiting for the first server
+            // event prevents taps and audio fixtures from being queued into a
+            // connection that never opened (especially visible on a phone
+            // moving through a tunnel or hotspot).
+            if status == .connecting {
+                connectionWatchdog?.cancel()
+                connectionWatchdog = nil
+                status = .ready
+            }
         }
 
         switch event.type {
@@ -329,9 +462,13 @@ final class RealtimeSession {
             }
 
         case "response.text.delta", "response.audio_transcript.delta":
+            // A delayed tail from the previous response must not leak into a
+            // barge-in turn after the user has started talking.
+            guard status != .listening else { return }
             appendCoachText(event.delta ?? "")
 
         case "response.audio.delta":
+            guard status != .listening else { return }
             guard let delta = event.delta, let pcm = Data(base64Encoded: delta) else { return }
             noteFirstOutput()
             audio.enqueue(pcm16: pcm)
@@ -341,6 +478,10 @@ final class RealtimeSession {
         case "response.done":
             closeOpenUserTranscript()
             closeOpenCoachMessage()
+            // Cloud or tunnel buffering can deliver the previous turn's done
+            // after a new push-to-talk turn has begun. Do not let it replace
+            // `.listening`, otherwise all remaining microphone chunks drop.
+            guard status != .listening else { return }
             // Audio keeps playing after the model is done generating, so the
             // status only drops back to ready once the queue drains.
             if audio.isPlaying {
@@ -443,15 +584,6 @@ final class RealtimeSession {
         return await AVAudioApplication.requestRecordPermission()
     }
 
-    private func requestSpeechRecognitionAccess() async -> Bool {
-        if SFSpeechRecognizer.authorizationStatus() == .authorized { return true }
-        return await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { status in
-                continuation.resume(returning: status == .authorized)
-            }
-        }
-    }
-
     /// `REALTIME_GATEWAY_HOST` comes from `Secrets.xcconfig` via Info.plist and
     /// is host[:port] only — a full URL cannot live in an xcconfig, where "//"
     /// starts a comment.
@@ -469,9 +601,37 @@ final class RealtimeSession {
         return URL(string: "\(scheme)://\(host)/realtime?conversationId=\(conversationId)")
     }
 
+    /// Gateway can be exposed through a temporary or deployed TLS tunnel for
+    /// real-device testing. Reuse the app's shared secret so the public
+    /// WebSocket is never an unauthenticated path to the provider key.
+    static func gatewayRequest(conversationId: String) -> URLRequest? {
+        guard let url = gatewayURL(conversationId: conversationId) else { return nil }
+        var request = URLRequest(url: url)
+        let secret =
+            (Bundle.main.infoDictionary?["COACH_SHARED_SECRET"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !secret.isEmpty, !secret.contains("$(") {
+            request.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
+        }
+        return request
+    }
+
     private static func isLocalHost(_ host: String) -> Bool {
-        let name = host.split(separator: ":").first.map(String.init) ?? host
-        if name == "localhost" || name == "127.0.0.1" || name.hasSuffix(".local") { return true }
+        let name: String
+        if host.hasPrefix("["), let closingBracket = host.firstIndex(of: "]") {
+            name = String(host[host.index(after: host.startIndex)..<closingBracket])
+        } else {
+            name = host.split(separator: ":").first.map(String.init) ?? host
+        }
+        if name == "localhost" || name == "127.0.0.1" || name == "::1"
+            || name.hasSuffix(".local")
+        { return true }
+        // IPv6 unique-local and link-local ranges, including Xcode's wired
+        // CoreDevice tunnel used for deterministic physical-device testing.
+        let lowercaseName = name.lowercased()
+        if lowercaseName.hasPrefix("fc") || lowercaseName.hasPrefix("fd")
+            || lowercaseName.hasPrefix("fe80:")
+        { return true }
         if name.hasPrefix("192.168.") || name.hasPrefix("10.") { return true }
         // 172.16.0.0 – 172.31.255.255
         if name.hasPrefix("172.") {

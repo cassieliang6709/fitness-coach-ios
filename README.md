@@ -104,12 +104,12 @@ For a new D1 database, apply `schema.sql`, `seed-exercises.sql`, and
 `seed-names.sql` before deploying the Worker.
 
 Four secrets, set with `wrangler secret put` (never in `wrangler.jsonc`, which
-is public): `ANTHROPIC_API_KEY`, `MINIMAX_API_KEY`, `KIMI_API_KEY`, and
+is public): `DEEPSEEK_API_KEY`, `MINIMAX_API_KEY`, `KIMI_API_KEY`, and
 `APP_SHARED_SECRET`.
 
 | Route | Auth | Purpose |
 | --- | --- | --- |
-| `GET /health` | Bearer | Reports whether the Claude and MiniMax keys are configured (never their values) |
+| `GET /health` | Bearer | Reports whether the DeepSeek and MiniMax keys are configured (never their values) |
 | `POST /coach/turn` | Bearer | Streams a coaching turn as SSE |
 | `GET /plan?user=…` | Bearer | Returns that install's active generated plan |
 | `POST /plan?user=…` | Bearer | Validates and stores a catalogue-backed plan |
@@ -122,6 +122,31 @@ state), `plan` / `plan_error`, `refusal`, `done`, and `error` events.
 The app executes `adjust_weight`, `swap_exercise`, and `remember` locally.
 `generate_plan` runs on the Worker because both validation and the catalogue
 live there; accepted plans are cached by the app for offline launches.
+
+## Realtime Gateway (`vance-gateway/`)
+
+The workout screen opens an authenticated WebSocket through this small Node
+Gateway. It owns the Vance prompt and provider credentials, reassembles RFC 6455
+continuation frames, and then proxies MiniMax text/audio events. The old
+standalone waveform route is intentionally gone: status, transcript, typed
+context and push-to-talk all live in the strength/cardio coaching screen. The
+Gateway refuses to start without `VANCE_GATEWAY_SHARED_SECRET`; use the same
+value configured as `COACH_SHARED_SECRET` in the app.
+
+```bash
+cd vance-gateway
+cp .env.example .env
+npm test
+BIND_HOST=127.0.0.1 PORT=8787 npm start
+```
+
+Debug builds bundle three Mandarin speech fixtures. The `背` / `累` / `弃`
+buttons decode them to 24 kHz PCM16 and pace them through the same authenticated
+WebSocket, commit and MiniMax response path as microphone audio. They are a
+repeatable live integration harness, not scripted coach replies.
+
+For signing, bundle-ID, and physical-network boundaries, see
+[`docs/ios-signing-and-device-testing.md`](docs/ios-signing-and-device-testing.md).
 
 ## Mascot artwork
 

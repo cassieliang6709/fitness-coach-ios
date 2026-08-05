@@ -6,6 +6,8 @@ struct StrengthCoachView: View {
     @Binding var path: [Route]
 
     @State private var confirmEnd = false
+    @State private var realtime = RealtimeSession()
+    @State private var realtimeDraft = ""
 
     var body: some View {
         MobileAppShell {
@@ -27,12 +29,16 @@ struct StrengthCoachView: View {
                 accessory
             }
 
-            ChatThread(
-                messages: session.strength.messages,
-                isTyping: session.strength.isTyping
-            )
-            .frame(maxHeight: .infinity)
-            .layoutPriority(1)
+            if session.usesDemoData {
+                ChatThread(
+                    messages: session.strength.messages,
+                    isTyping: session.strength.isTyping
+                )
+                .frame(maxHeight: .infinity)
+                .layoutPriority(1)
+            } else {
+                RealtimeCoachPanel(session: realtime)
+            }
         } bottom: {
             if session.phase == .strengthComplete {
                 BottomBar {
@@ -42,14 +48,33 @@ struct StrengthCoachView: View {
                     }
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-            } else {
+            } else if session.usesDemoData {
                 WorkoutInputBar(thread: session.strength) {
                     confirmEnd = true
+                }
+            } else {
+                BottomBar {
+                    VStack(spacing: 10) {
+                        RealtimeCoachControls(session: realtime, draft: $realtimeDraft)
+                        Button("结束训练") { confirmEnd = true }
+                            .font(Theme.caption)
+                            .foregroundStyle(Theme.secondaryText)
+                    }
                 }
             }
         }
         .animation(.easeInOut(duration: 0.25), value: session.phase)
-        .onAppear { session.enterStrength() }
+        .onAppear {
+            session.enterStrength()
+            guard !session.usesDemoData else { return }
+            configureRealtime()
+            realtime.connect()
+        }
+        .onChange(of: session.realtimeCoachContext) {
+            guard !session.usesDemoData else { return }
+            configureRealtime()
+        }
+        .onDisappear { realtime.disconnect() }
         .confirmationDialog("结束本次训练？", isPresented: $confirmEnd, titleVisibility: .visible) {
             // Sets are already logged, so ending early goes to the review and
             // reports the partial session rather than discarding it.
@@ -59,6 +84,14 @@ struct StrengthCoachView: View {
             }
             Button("继续训练", role: .cancel) {}
         }
+    }
+
+    private func configureRealtime() {
+        realtime.configure(
+            style: session.aiStyle,
+            state: session.realtimeCoachContext,
+            memories: session.realtimeMemories
+        )
     }
 
     @ViewBuilder

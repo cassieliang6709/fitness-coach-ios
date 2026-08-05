@@ -11,7 +11,6 @@ enum Route: Hashable {
     case strength
     case cardio
     case review
-    case realtime
     case riveLab
 
     var path: String {
@@ -24,7 +23,6 @@ enum Route: Hashable {
         case .strength: return "/workout/strength"
         case .cardio: return "/workout/cardio"
         case .review: return "/workout/review"
-        case .realtime: return "/workout/realtime"
         case .riveLab: return "/rive-lab"
         }
     }
@@ -39,8 +37,7 @@ enum Route: Hashable {
     }
 
     static let all: [Route] = [
-        .home, .plans, .exerciseLibrary, .legDay, .strength, .cardio, .review, .realtime,
-        .riveLab,
+        .home, .plans, .exerciseLibrary, .legDay, .strength, .cardio, .review, .riveLab,
     ]
 }
 
@@ -80,8 +77,6 @@ struct RootView: View {
                         CardioCoachView(path: $path)
                     case .review:
                         ReviewView(path: $path)
-                    case .realtime:
-                        RealtimeCoachView(path: $path)
                     case .riveLab:
                         RiveLabView(path: $path)
                     }
@@ -120,7 +115,8 @@ struct RootView: View {
         }
     }
 
-    /// Deep-link straight to a route for screenshotting and manual QA:
+    /// Deep-link straight to a route for screenshotting and manual QA. This
+    /// keeps the selected app mode (live or `-demo`) unchanged:
     /// `xcrun simctl launch booted <id> -route /workout/strength`
     private func applyLaunchRoute() {
         #if DEBUG

@@ -3,7 +3,7 @@
   "name": "fitness-coach-api",
   "main": "src/index.ts",
   "compatibility_date": "2025-11-01",
-  // Required by @anthropic-ai/sdk (it imports node: built-ins).
+  // Required by Worker dependencies that import node: built-ins.
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {

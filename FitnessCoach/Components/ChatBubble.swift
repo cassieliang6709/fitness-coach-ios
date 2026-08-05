@@ -2,6 +2,12 @@ import SwiftUI
 
 struct ChatBubble: View {
     let message: ChatMessage
+    let accessibilityIdentifier: String?
+
+    init(message: ChatMessage, accessibilityIdentifier: String? = nil) {
+        self.message = message
+        self.accessibilityIdentifier = accessibilityIdentifier
+    }
 
     private var isUser: Bool { message.role == .user }
 
@@ -16,6 +22,7 @@ struct ChatBubble: View {
             Text(message.content)
                 .font(Theme.body)
                 .foregroundStyle(isUser ? .white : Theme.mainText)
+                .accessibilityIdentifier(accessibilityIdentifier ?? "")
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)

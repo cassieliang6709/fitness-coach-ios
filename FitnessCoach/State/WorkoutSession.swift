@@ -140,7 +140,7 @@ final class WorkoutSession {
         self.store = store
         self.isDemoMode = Self.usesDemoData
         self.api = isDemoMode ? nil : Self.makeAPI()
-        if isDemoMode {
+        if isDemoMode || Self.usesLiveAudioFixture {
             plan = MockData.legDayPlan
             hasGeneratedPlan = true
         } else if let cached = PlanCache.loadForToday(), let cachedPlan = cached.asPlan {
@@ -162,7 +162,18 @@ final class WorkoutSession {
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("-live") { return false }
         return arguments.contains("-uitest") || arguments.contains("-onboarded")
-            || arguments.contains("-route")
+            || arguments.contains("-demo")
+    }
+
+    /// A deterministic exercise/context fixture that still uses live services.
+    /// This stays separate from demo mode so bundled test audio can never turn
+    /// into a scripted assistant reply by accident.
+    private static var usesLiveAudioFixture: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-live-audio-fixture")
+        #else
+        return false
+        #endif
     }
 
     private func makeDailyThread() {
@@ -393,6 +404,26 @@ final class WorkoutSession {
             totalSets: currentExercise.sets,
             venue: trainingVenue
         )
+    }
+
+    /// A one-time snapshot for the MiniMax realtime connection. The gateway
+    /// uses this to give the voice coach the same current exercise, plan and
+    /// memory context as the text Coach API.
+    var realtimeCoachContext: CoachContext {
+        let realtimePhase: String
+        switch phase {
+        case .planning, .review:
+            realtimePhase = "planning"
+        case .strengthActive, .strengthRest, .strengthComplete:
+            realtimePhase = "strength"
+        case .cardioActive, .cardioComplete:
+            realtimePhase = "cardio"
+        }
+        return coachContext(phase: realtimePhase)
+    }
+
+    var realtimeMemories: [String] {
+        store.activeMemories().map(\.text)
     }
 
     /// Executes a coach action and returns the tool result the model reads next.

@@ -29,6 +29,9 @@
 		5F30982605D19A4277C4DD8D /* CardioCoachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C00A20E3FE5CA88E74CD4EA /* CardioCoachView.swift */; };
 		64957680C0E6BC7E5F3CCC9C /* AIStyleSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 914915B268EE287F23DBF918 /* AIStyleSelector.swift */; };
 		68610DED597F1CD3C4031EAF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1B618CBF39FF185F6B3E9A1B /* Assets.xcassets */; };
+		6A0D1001E45A4C28B5290001 /* 01_back.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 6A0D1001E45A4C28B5290011 /* 01_back.m4a */; };
+		6A0D1001E45A4C28B5290002 /* 02_tired.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 6A0D1001E45A4C28B5290012 /* 02_tired.m4a */; };
+		6A0D1001E45A4C28B5290003 /* 03_giveup.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 6A0D1001E45A4C28B5290013 /* 03_giveup.m4a */; };
 		707850155AACB74E6BC3B4A7 /* WorkoutInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6873837BE6BB59BC6C4B58C /* WorkoutInputBar.swift */; };
 		725A1C0AC05F7207252CEB26 /* RealtimeAudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE17844FDC00B74D0DE4C12E /* RealtimeAudioEngine.swift */; };
 		73641F93C3733087B2B97724 /* WorkoutFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DDD6DAE91577C1405E076F /* WorkoutFlowUITests.swift */; };
@@ -88,6 +91,9 @@
 		0EE6F9CFAC97BDD6AE7500AA /* LegDayDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegDayDetailView.swift; sourceTree = "<group>"; };
 		1408723B97FE7F5F6973D66B /* CoachSpeechPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachSpeechPlayer.swift; sourceTree = "<group>"; };
 		1B618CBF39FF185F6B3E9A1B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		6A0D1001E45A4C28B5290011 /* 01_back.m4a */ = {isa = PBXFileReference; lastKnownFileType = audio.m4a; path = 01_back.m4a; sourceTree = "<group>"; };
+		6A0D1001E45A4C28B5290012 /* 02_tired.m4a */ = {isa = PBXFileReference; lastKnownFileType = audio.m4a; path = 02_tired.m4a; sourceTree = "<group>"; };
+		6A0D1001E45A4C28B5290013 /* 03_giveup.m4a */ = {isa = PBXFileReference; lastKnownFileType = audio.m4a; path = 03_giveup.m4a; sourceTree = "<group>"; };
 		1CA518FE2897866F2BCE097C /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		22BE20B857330F9517F95821 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		261FA6B31E54B2A7C8C2C7C6 /* SpeechRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognizer.swift; sourceTree = "<group>"; };
@@ -310,6 +316,9 @@
 			children = (
 				AEE7F13CCBCF5109ABCC28DA /* Rive */,
 				1B618CBF39FF185F6B3E9A1B /* Assets.xcassets */,
+				6A0D1001E45A4C28B5290011 /* 01_back.m4a */,
+				6A0D1001E45A4C28B5290012 /* 02_tired.m4a */,
+				6A0D1001E45A4C28B5290013 /* 03_giveup.m4a */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -444,6 +453,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				68610DED597F1CD3C4031EAF /* Assets.xcassets in Resources */,
+				6A0D1001E45A4C28B5290001 /* 01_back.m4a in Resources */,
+				6A0D1001E45A4C28B5290002 /* 02_tired.m4a in Resources */,
+				6A0D1001E45A4C28B5290003 /* 03_giveup.m4a in Resources */,
 				3AE3544EE02441ACA4A57F26 /* LICENSE-RIVE-IOS.txt in Resources */,
 				9D40B84F60235DD4E0FB932A /* README.md in Resources */,
 				E1571016F6252030F3FB0B33 /* rive-skills-demo.riv in Resources */,
