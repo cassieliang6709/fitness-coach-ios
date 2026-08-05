@@ -2,13 +2,8 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# 用生产版 package.json（去掉 wrangler，避免 npx 触发下载）
-COPY package.prod.json package.json
-COPY package-lock.json ./
-
-# 只安装生产依赖 + workerd
-RUN npm ci --omit=dev && \
-    npm install workerd --no-save
+# 手动安装依赖（跳过 package.json，避免 npx 触发 wrangler）
+RUN npm install @anthropic-ai/sdk workerd --no-save
 
 # 拷贝源码和配置
 COPY src ./src
