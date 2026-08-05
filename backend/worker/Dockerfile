@@ -2,11 +2,9 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# 只装 workerd（跳过 scripts 避免触发 wrangler）
-RUN npm install workerd --no-save --no-package-lock --ignore-scripts
-
-# 只装 @anthropic-ai/sdk（唯一运行时依赖）
-RUN npm install @anthropic-ai/sdk --no-save --no-package-lock --ignore-scripts
+# 直接装平台特定的 workerd 二进制包（跳过 wrapper 的下载脚本）
+# workerd 主包会通过 optionalDependencies 拉 @cloudflare/workerd-linux-64
+RUN npm install @cloudflare/workerd-linux-64 @anthropic-ai/sdk --no-save --no-package-lock
 
 # 拷贝源码和配置
 COPY src ./src
@@ -20,9 +18,7 @@ ENV NODE_ENV=production
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "require('http').get('http://127.0.0.1:8788/health', r => process.exit(r.statusCode === 200 || r.statusCode === 401 ? 0 : 1)).on('error', () => process.exit(1))"
 
-# 直接用 workerd 绝对路径
-CMD ["/app/node_modules/workerd/bin/workerd", "serve", "--binary", "--experimental", \
+# workerd 二进制在 @cloudflare/workerd-linux-64/bin/workerd
+CMD ["/app/node_modules/@cloudflare/workerd-linux-64/bin/workerd", "serve", \
      "--socket-addr=entry=0.0.0.0:8788", \
-     "--external-addr=loopback=127.0.0.1:50510", \
-     "--control-fd=3", \
      "wrangler.jsonc"]
