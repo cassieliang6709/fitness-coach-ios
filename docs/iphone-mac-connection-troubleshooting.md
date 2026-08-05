@@ -139,3 +139,24 @@ MiniMax; they are not scripted assistant responses.
 - Do not use “the tunnel currently responds” to claim a stable deployment.
 - Never commit personal signing, secrets, `.env`, `.dev.vars`,
   `Secrets.xcconfig` or temporary host names.
+
+## 10. Production ingress incident and isolation boundary (2026-08-05)
+
+A Vance `server {}` block was accidentally nested inside an existing main-site
+Nginx `server {}` block. Nginx rejected the entire shared configuration, so
+both the Vance hostname and the main site were affected. A dedicated hostname
+does not contain an invalid shared Nginx configuration.
+
+For any Vance ingress edit, keep each Vance HTTP/HTTPS `server` as a direct
+child of `http {}` and keep `map` directives at `http {}` scope. Render the
+candidate with the production template variables and pass `nginx -t` before a
+reload or restart. Reconcile the validated source PR immediately; never leave
+an ECS-release-only hotfix.
+
+FitnessCoach source/build access does not include the main-site source, its
+credentials or a Docker socket, and Vance containers do not mount main-site
+paths. That is useful source and data separation. It is not a hostile-container
+security guarantee: the shared Nginx currently participates in both Docker
+networks to proxy Vance. Strictly preventing a compromised Vance runtime from
+reaching the main site requires a separate ECS/network/reverse-proxy boundary,
+not merely separate Docker network names.

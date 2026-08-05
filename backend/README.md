@@ -13,7 +13,10 @@ realtime.magicandgrind.com (nginx)
     └─ /gateway/* → vance-gateway:8787 (GymVision 等)
 ```
 
-**部署位置**：阿里云 ECS `47.120.13.248`（与 sourcerlinda 同机但完全隔离）
+**部署位置**：阿里云 ECS `47.120.13.248`。Vance 有独立代码、Compose、密钥和
+Docker 网络，但目前与 SourcerLinda 共用一个入口 Nginx；这不是对抗已入侵容器的
+硬安全边界。完整的生产交接、当前限制与隔离升级路径见
+[`docs/VANCE_PRODUCTION_BACKEND_HANDOFF_20260805.md`](../docs/VANCE_PRODUCTION_BACKEND_HANDOFF_20260805.md)。
 
 **隔离原则**：
 - 独立 Docker 网络 `vance`
@@ -26,7 +29,7 @@ realtime.magicandgrind.com (nginx)
 
 ```
 backend/
-├── worker/           # Cloudflare Worker（workerd 容器跑）
+├── worker/           # Cloudflare Worker（Wrangler 本地运行时 + D1）
 │   ├── src/          # TypeScript 源码
 │   ├── Dockerfile
 │   └── wrangler.jsonc
@@ -89,25 +92,25 @@ REALTIME_GATEWAY_SECRET = <VANCE_GATEWAY_SECRET>
 
 ## 部署到生产
 
-### 第一次部署（已完成）
+### 已完成的生产入口
 - [x] DNS: `realtime.magicandgrind.com` → `47.120.13.248`
-- [ ] ECS 初始化（见下）
-- [ ] nginx server 块加入 sourcerlinda 主仓库
-- [ ] HTTPS 证书申请
+- [x] HTTPS 证书
+- [x] Nginx Vance virtual host 已合入 SourcerLinda
+- [x] Worker 与 Gateway 已作为独立 Compose 服务运行
 
 ### 日常部署
 ```bash
-# 1. 提 PR → review → merge 到 main
-
-# 2. SSH 到 ECS
-ssh sourcerlinda
-
-# 3. 进入 vance 目录
-cd /opt/vance
-
-# 4. 拉代码 + 部署
-./deploy.sh
+# 仅限已获授权的 Vance 生产操作员。
+# 从已验证的 FitnessCoach main SHA / 已验证 bundle 准备干净源码后：
+cd /opt/vance/backend
+docker compose build worker gateway
+docker compose up -d --no-deps --force-recreate worker gateway
 ```
+
+不要用 `git reset --hard` 覆盖一个不明状态的生产工作树，也不要把 Vance 部署变成
+SourcerLinda 整栈重启。若 container recreate 改变了 upstream IP，按
+[`docs/VANCE_PRODUCTION_BACKEND_HANDOFF_20260805.md`](../docs/VANCE_PRODUCTION_BACKEND_HANDOFF_20260805.md)
+的候选配置校验流程确认后，才 reload 共享 Nginx。
 
 ### 查看日志
 ```bash
@@ -116,23 +119,18 @@ docker logs vance-gateway -f
 ```
 
 ### 回滚
-```bash
-cd /opt/vance
-git log --oneline -5  # 找到上一个正常 commit
-git reset --hard <commit-sha>
-./deploy.sh
-```
+
+使用已记录的上一版 Vance image / 已验证的 release source 重新创建**仅 Vance**的
+`worker` 和 `gateway`。保留 `/data` Docker volume、外部生产配置和当前运行镜像；
+不要删除 volume、不要覆盖主站 release，也不要把主站 Nginx 当成 Vance 的回滚单位。
 
 ## 密钥管理
 
 **生产密钥**在 ECS 的 `/opt/prod-config/vance/.env`，**不在 Git 里**。
 
-修改密钥：
-```bash
-ssh sourcerlinda
-vim /opt/prod-config/vance/.env
-cd /opt/vance/backend && docker compose restart
-```
+修改密钥后必须 force-recreate 受影响的 Vance 服务；`docker compose restart` 不会重读
+环境变量。App-facing static secret 的轮换还需要兼容旧 App 的双 token 方案，否则现有
+安装包会立刻收到 401。不要把真实密钥交给普通代码贡献者。
 
 新增密钥：
 1. 在 `.env.example` 里加占位符
@@ -202,7 +200,8 @@ dig realtime.magicandgrind.com +short
 
 **健康检查**：
 - https://realtime.magicandgrind.com/health → 应该返回 `ok`
-- https://realtime.magicandgrind.com/api/health → 应该返回 401（要鉴权）
+- `/plan`、`/exercises`、`/coach/turn` 均要求 Worker 鉴权
+- `/gateway/health` 要求 Gateway 鉴权
 
 **资源占用**：
 ```bash
@@ -223,10 +222,19 @@ docker system df
 
 ## 与 sourcerlinda 的关系
 
-完全独立的两个项目，**只是共用同一台 ECS**：
+两个项目的源码、部署物、数据和密钥独立，**但目前共用一台 ECS 和入口 Nginx**：
 - 不同 Docker 网络
 - 不同密钥
 - 不同域名
 - 不同代码仓库（sourcerlinda 在 caizhidian-ops/sourcerlinda）
 
-唯一交叉点：nginx server 块要加到 sourcerlinda 主仓库的 `docker/nginx/nginx.conf` 模板里（因为 nginx 容器是 sourcerlinda 的）。该块必须直接放在 `http {}` 内；同时需要把 nginx 服务持久加入外部 Docker 网络 `vance`。不要把 `map` 写进 `server {}`，也不要直接编辑某个 ECS release 目录——两者都会让共享 nginx 无法启动或在下次发布时丢失。
+唯一功能性交叉点：Nginx 的 Vance `server` 块要加到 SourcerLinda 主仓库的
+`docker/nginx/nginx.conf` 模板里（因为入口 Nginx 属于 SourcerLinda）。该块必须直接
+放在 `http {}` 内；同时需要把 Nginx 服务持久加入外部 Docker 网络 `vance`。不要把
+`map` 写进 `server {}`，也不要直接编辑某个 ECS release 目录——两者都会让共享 Nginx
+无法启动或在下次发布时丢失。
+
+这条网络连接只用于 Nginx → Vance upstream；它不应被误称为安全隔离。Vance 容器不
+挂载 Docker socket、主站 release、主站数据库或主站配置，但共享入口仍会形成路由层
+耦合。任何要求“被攻破的 Vance 容器绝不能触及主站”的发布，必须先完成独立 ECS/网络
+边界迁移，不能只靠同机 Docker 网络命名。

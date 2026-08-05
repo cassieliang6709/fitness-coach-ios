@@ -7,6 +7,10 @@ services:
       context: ./worker
     container_name: vance-worker
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     # Wrangler owns the D1 emulator as well as workerd; 128 MiB was only
     # sufficient for the broken bare-workerd setup that had no bindings.
     mem_limit: 256m
@@ -33,6 +37,10 @@ services:
       context: ./gateway
     container_name: vance-gateway
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     mem_limit: 256m
     cpus: 0.5
     env_file:
