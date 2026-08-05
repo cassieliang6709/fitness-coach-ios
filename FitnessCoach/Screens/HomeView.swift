@@ -325,7 +325,11 @@ private struct GymCameraPicker: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
 
-    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+    final class Coordinator:
+        NSObject,
+        UINavigationControllerDelegate,
+        UIImagePickerControllerDelegate
+    {
         let onCapture: (UIImage) -> Void
         let onDismiss: () -> Void
 
@@ -392,6 +396,8 @@ private struct HomePlanTab: View {
                 WeekStripe(stats: stats)
 
                 MetricRow(metrics: stats.tiles)
+
+                HealthSummarySection(service: session.health)
 
                 memorySection
 
@@ -512,6 +518,120 @@ private struct HomePlanTab: View {
     }
 }
 
+// MARK: - Apple Health
+
+/// A user-initiated, read-only Apple Health surface. HealthKit summaries never
+/// leave this service or enter a coaching payload.
+private struct HealthSummarySection: View {
+    @Bindable var service: HealthKitService
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "heart.text.square.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.red)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(.red.opacity(0.1)))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Apple 健康")
+                        .font(Theme.cardTitle)
+                        .foregroundStyle(Theme.mainText)
+                    Text("仅在本机汇总，不发送给教练或服务端")
+                        .font(Theme.caption)
+                        .foregroundStyle(Theme.secondaryText)
+                }
+
+                Spacer(minLength: 8)
+
+                action
+            }
+
+            content
+        }
+        .card()
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch service.state {
+        case .unavailable:
+            Text("当前设备不支持 Apple 健康。")
+                .font(Theme.caption)
+                .foregroundStyle(Theme.secondaryText)
+        case .notConnected:
+            Text("可读取近 7 天训练、今日步数和活动能量；不读取心率或医疗记录。")
+                .font(Theme.caption)
+                .foregroundStyle(Theme.secondaryText)
+        case .requestingAccess, .loading:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(service.state == .requestingAccess ? "正在请求授权…" : "正在本机汇总…")
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.secondaryText)
+            }
+        case .ready(let summary):
+            HStack(spacing: 8) {
+                HealthMetric(value: "\(summary.workoutsInLastSevenDays) 次", label: "近 7 天训练")
+                HealthMetric(value: "\(summary.workoutMinutesInLastSevenDays) 分", label: "训练时长")
+                HealthMetric(value: summary.todaySteps.map(String.init) ?? "—", label: "今日步数")
+                HealthMetric(
+                    value: summary.todayActiveEnergyKilocalories.map { "\($0) kcal" } ?? "—",
+                    label: "活动能量"
+                )
+            }
+        case .noData:
+            Text("暂未读取到可用数据。可能没有记录，也可能未允许部分读取权限。")
+                .font(Theme.caption)
+                .foregroundStyle(Theme.secondaryText)
+        case .failed:
+            Text("暂时无法读取 Apple 健康数据，请稍后重试。")
+                .font(Theme.caption)
+                .foregroundStyle(Theme.secondaryText)
+        }
+    }
+
+    @ViewBuilder
+    private var action: some View {
+        switch service.state {
+        case .notConnected:
+            Button("连接") {
+                Task { await service.requestAccessAndRefresh() }
+            }
+            .font(Theme.caption)
+            .foregroundStyle(Theme.primary)
+        case .ready, .noData, .failed:
+            Button("刷新") {
+                Task { await service.refresh() }
+            }
+            .font(Theme.caption)
+            .foregroundStyle(Theme.primary)
+        case .unavailable, .requestingAccess, .loading:
+            EmptyView()
+        }
+    }
+}
+
+private struct HealthMetric: View {
+    let value: String
+    let label: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.mainText)
+                .lineLimit(1)
+            Text(label)
+                .font(.system(size: 10))
+                .foregroundStyle(Theme.secondaryText)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 /// A whole location and its confirmed equipment live in one editable memory,
 /// so the list never fragments a single gym into multiple device chips.
 private struct EquipmentLocationMemoryRow: View {
@@ -532,7 +652,10 @@ private struct EquipmentLocationMemoryRow: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.surface))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.border, lineWidth: 1))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Theme.border, lineWidth: 1)
+        )
     }
 }
 

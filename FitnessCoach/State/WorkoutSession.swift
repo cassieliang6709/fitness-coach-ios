@@ -13,6 +13,9 @@ final class WorkoutSession {
     // MARK: - Plan & preferences
 
     let plan = MockData.legDayPlan
+    /// Local-only Apple Health summary. It is intentionally separate from the
+    /// coach context and the persisted training records.
+    let health = HealthKitService()
 
     var aiStyle: AIStyle = .practical {
         didSet {

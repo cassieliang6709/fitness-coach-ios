@@ -51,6 +51,7 @@
 		FB5DAD1A355F748FE0B84341 /* CoachThread.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279DE87CE682310E78C9E3E5 /* CoachThread.swift */; };
 		A1B2C3D4E5F6000000000001 /* GymLocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B2C3D4E5F6000000000001 /* GymLocationService.swift */; };
 		A1B2C3D4E5F6000000000002 /* GymLocationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B2C3D4E5F6000000000002 /* GymLocationPicker.swift */; };
+		A1B2C3D4E5F6000000000003 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B2C3D4E5F6000000000003 /* HealthKitService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -112,6 +113,8 @@
 		"TEMP_D1C79160-FAF1-4640-B85E-0A18166F6C7E" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		B1B2C3D4E5F6000000000001 /* GymLocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymLocationService.swift; sourceTree = "<group>"; };
 		B1B2C3D4E5F6000000000002 /* GymLocationPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymLocationPicker.swift; sourceTree = "<group>"; };
+		B1B2C3D4E5F6000000000003 /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
+		B1B2C3D4E5F6000000000004 /* FitnessCoach.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FitnessCoach.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -128,7 +131,9 @@
 				0D943CE4B497E90C9380B15E /* Screens */,
 				79F20949A4C76ECBC20E4146 /* Speech */,
 				10A5D53C0A79C46EDA03E43F /* State */,
+				C1B2C3D4E5F6000000000002 /* Health */,
 				C1B2C3D4E5F6000000000001 /* Location */,
+				B1B2C3D4E5F6000000000004 /* FitnessCoach.entitlements */,
 				9AFBE4284C22662D41B46887 /* Info.plist */,
 			);
 			path = FitnessCoach;
@@ -290,6 +295,14 @@
 			path = Location;
 			sourceTree = "<group>";
 		};
+		C1B2C3D4E5F6000000000002 /* Health */ = {
+			isa = PBXGroup;
+			children = (
+				B1B2C3D4E5F6000000000003 /* HealthKitService.swift */,
+			);
+			path = Health;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -341,8 +354,13 @@
 					BAB757D97A642C5B3F74C679 = {
 						TestTargetID = D0827844BCFD6DDE8326613F;
 					};
-					D0827844BCFD6DDE8326613F = {
-						ProvisioningStyle = Automatic;
+				D0827844BCFD6DDE8326613F = {
+					ProvisioningStyle = Automatic;
+					SystemCapabilities = {
+						com.apple.HealthKit = {
+							enabled = 1;
+						};
+					};
 					};
 				};
 			};
@@ -423,6 +441,7 @@
 				168E3B6ED12354B41CCADFDA /* WorkoutSession.swift in Sources */,
 				A1B2C3D4E5F6000000000001 /* GymLocationService.swift in Sources */,
 				A1B2C3D4E5F6000000000002 /* GymLocationPicker.swift in Sources */,
+				A1B2C3D4E5F6000000000003 /* HealthKitService.swift in Sources */,
 				84BAA0D35C17D81798D5A915 /* WorkoutStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -474,6 +493,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				CODE_SIGN_ENTITLEMENTS = FitnessCoach/FitnessCoach.entitlements;
 				DEVELOPMENT_TEAM = M7BPQ88622;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = FitnessCoach/Info.plist;
@@ -561,6 +581,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				CODE_SIGN_ENTITLEMENTS = FitnessCoach/FitnessCoach.entitlements;
 				DEVELOPMENT_TEAM = M7BPQ88622;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = FitnessCoach/Info.plist;
