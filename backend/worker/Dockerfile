@@ -13,12 +13,15 @@ COPY wrangler.jsonc tsconfig.json ./
 # D1 数据库 schema（首次启动需要 migrate）
 COPY schema.sql seed-exercises.sql seed-names.sql ./
 
+# 预先安装 wrangler（避免 npx 每次启动都下载）
+RUN npx wrangler --version
+
 EXPOSE 8788
 
-# wrangler dev 监听 0.0.0.0，生产模式下用 --local 走 workerd
 ENV NODE_ENV=production
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD node -e "require('http').get('http://127.0.0.1:8788/health', r => process.exit(r.statusCode === 200 || r.statusCode === 401 ? 0 : 1)).on('error', () => process.exit(1))"
 
-CMD ["npx", "wrangler", "dev", "--local", "--ip", "0.0.0.0", "--port", "8788"]
+# 用 --no-bundle 跳过 esbuild（已经在 npm ci 时处理过依赖）
+CMD ["npx", "wrangler", "dev", "--local", "--ip", "0.0.0.0", "--port", "8788", "--no-bundle"]
