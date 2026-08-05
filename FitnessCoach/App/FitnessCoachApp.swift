@@ -10,26 +10,40 @@ struct FitnessCoachApp: App {
     @State private var session: WorkoutSession
 
     init() {
-        // Every explicit demo entry gets a throwaway store. In particular,
-        // debug deep links must not seed the user's persistent database with
-        // the sample profile and memories.
+        // Demo and UI-test runs get a throwaway store. A debug deep link only
+        // chooses a screen; it must not silently turn live coaching into the
+        // sample script.
         let arguments = ProcessInfo.processInfo.arguments
+        let usesLiveAudioFixture = Self.usesLiveAudioFixture(arguments)
         let usesDemoStore =
             arguments.contains("-uitest") || arguments.contains("-onboarded")
-            || arguments.contains("-route")
+            || arguments.contains("-demo") || usesLiveAudioFixture
         let container = WorkoutStore.makeContainer(inMemory: usesDemoStore)
         let store = WorkoutStore(context: container.mainContext)
 
         // A genuine first launch goes through the welcome flow, which is what
-        // writes the profile and the first memory chips. `-onboarded` and any
-        // deep link (which presumes an existing user) skip straight past it.
-        if arguments.contains("-onboarded") || arguments.contains("-route") {
+        // writes the profile and the first memory chips. The test/demo flag
+        // skips straight past it; a deep link continues to use the real store.
+        if arguments.contains("-onboarded") || arguments.contains("-demo")
+            || usesLiveAudioFixture
+        {
             store.seedDemoProfileIfNeeded()
         }
 
         self.container = container
         self.store = store
         _session = State(initialValue: WorkoutSession(store: store))
+    }
+
+    /// Debug-only harness: a deterministic workout with live network clients,
+    /// used by the bundled-audio integration test. Assistant output is never
+    /// seeded — it must still arrive from the realtime gateway.
+    private static func usesLiveAudioFixture(_ arguments: [String]) -> Bool {
+        #if DEBUG
+        return arguments.contains("-live-audio-fixture")
+        #else
+        return false
+        #endif
     }
 
     var body: some Scene {

@@ -1,48 +1,31 @@
 import SwiftUI
 
-/// /workout/realtime — end-to-end voice with MiniMax through the Coach Gateway.
-///
-/// Deliberately plain next to the other coaching pages: this is the screen that
-/// answers "does the realtime path work at all", so connection state, latency
-/// and the raw transcript are all visible rather than styled away.
-struct RealtimeCoachView: View {
-    @Binding var path: [Route]
-
-    @State private var session = RealtimeSession()
-    @State private var draft = ""
+/// The live MiniMax conversation embedded directly in a workout screen.
+/// There is intentionally no standalone realtime destination: the current
+/// exercise card and the coach's spoken guidance belong in one place.
+struct RealtimeCoachPanel: View {
+    let session: RealtimeSession
 
     var body: some View {
-        MobileAppShell {
-            PageHeader(
-                title: "实时语音陪练",
-                style: .navBar,
-                onBack: {
-                    session.disconnect()
-                    path.removeLast()
-                }
-            )
-
+        VStack(spacing: 0) {
             statusStrip
                 .padding(.horizontal, Theme.pagePadding)
                 .padding(.bottom, 12)
 
+            if let issue = session.microphoneIssue {
+                Label(issue, systemImage: "mic.slash")
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                    .padding(.horizontal, Theme.pagePadding)
+                    .padding(.bottom, 12)
+            }
+
             transcript
                 .frame(maxHeight: .infinity)
                 .layoutPriority(1)
-        } bottom: {
-            BottomBar {
-                VStack(spacing: 12) {
-                    contextField
-                    talkButton
-                }
-            }
         }
         .animation(.easeInOut(duration: 0.2), value: session.status)
-        .onAppear { session.connect() }
-        .onDisappear { session.disconnect() }
     }
-
-    // MARK: - Status
 
     private var statusStrip: some View {
         HStack(spacing: 10) {
@@ -54,6 +37,7 @@ struct RealtimeCoachView: View {
                 .font(Theme.caption)
                 .foregroundStyle(Theme.secondaryText)
                 .lineLimit(2)
+                .accessibilityIdentifier("realtime-status")
 
             Spacer(minLength: 8)
 
@@ -87,14 +71,12 @@ struct RealtimeCoachView: View {
         }
     }
 
-    // MARK: - Transcript
-
     private var transcript: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     if session.messages.isEmpty {
-                        Text("按住下面的按钮说话，松开后教练会用语音回你。")
+                        Text("按住下方按钮说话，教练会结合当前动作实时回应。")
                             .font(Theme.body)
                             .foregroundStyle(Theme.secondaryText)
                             .padding(.top, 24)
@@ -106,7 +88,9 @@ struct RealtimeCoachView: View {
                                 id: message.id.uuidString,
                                 role: message.role == .user ? .user : .assistant,
                                 content: message.text
-                            )
+                            ),
+                            accessibilityIdentifier: message.role == .user
+                                ? "realtime-user-message" : "realtime-coach-message"
                         )
                         .id(message.id)
                     }
@@ -122,17 +106,63 @@ struct RealtimeCoachView: View {
             }
         }
     }
+}
 
-    // MARK: - Input
+/// Shared text and push-to-talk controls for the embedded live coach.
+struct RealtimeCoachControls: View {
+    let session: RealtimeSession
+    @Binding var draft: String
 
-    /// Typed context for the same session — the gym-vision result and the user's
-    /// time budget belong here, not in a second conversation.
+    var body: some View {
+        VStack(spacing: 12) {
+            #if DEBUG
+            testAudioRow
+            #endif
+            contextField
+            talkButton
+        }
+    }
+
+    #if DEBUG
+    /// Bundled speech fixtures for repeatable end-to-end realtime QA.
+    private var testAudioRow: some View {
+        HStack(spacing: 8) {
+            Text("测试语音")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.secondaryText)
+
+            ForEach(Self.testAudioClips, id: \.resource) { clip in
+                Button(clip.title) {
+                    session.injectTestAudio(resource: clip.resource)
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.secondaryText)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Theme.surface))
+                .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 1))
+                .buttonStyle(.plain)
+                .disabled(!session.status.isConnected)
+                .accessibilityIdentifier("inject-audio-\(clip.resource)")
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private static let testAudioClips: [(title: String, resource: String)] = [
+        ("背", "01_back"),
+        ("累", "02_tired"),
+        ("弃", "03_giveup"),
+    ]
+    #endif
+
     private var contextField: some View {
         HStack(spacing: 8) {
             TextField("补充一句文字上下文…", text: $draft)
                 .font(Theme.body)
                 .submitLabel(.send)
                 .onSubmit(submit)
+                .accessibilityIdentifier("realtime-text-input")
 
             Button(action: submit) {
                 Image(systemName: "arrow.up")
@@ -143,6 +173,7 @@ struct RealtimeCoachView: View {
                         Circle().fill(canSend ? Theme.primary : Theme.primary.opacity(0.35)))
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("realtime-send-button")
             .disabled(!canSend)
         }
         .padding(.horizontal, 12)
@@ -161,9 +192,6 @@ struct RealtimeCoachView: View {
         draft = ""
     }
 
-    /// Push-to-talk. A drag gesture with zero distance rather than a Button,
-    /// because a Button's action only fires on release — the mic has to open on
-    /// touch-down.
     private var talkButton: some View {
         let isTalking = session.status == .listening
 

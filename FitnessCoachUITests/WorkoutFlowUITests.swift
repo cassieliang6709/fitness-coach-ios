@@ -211,6 +211,89 @@ final class WorkoutFlowUITests: XCTestCase {
 
     // MARK: - Voice UI states and the knee adjustment
 
+    /// Optional live integration harness. A bundled voice clip is decoded and
+    /// paced through the microphone WebSocket path; the assistant response must
+    /// still come from the running MiniMax Gateway — never MockData.
+    func testLiveRealtimeAcceptsBackVoiceFixture() throws {
+        try assertLiveAudioFixture("01_back")
+    }
+
+    func testLiveRealtimeAcceptsTiredVoiceFixture() throws {
+        try assertLiveAudioFixture("02_tired")
+    }
+
+    func testLiveRealtimeAcceptsGiveUpVoiceFixture() throws {
+        try assertLiveAudioFixture("03_giveup")
+    }
+
+    /// Physical-device acceptance path: keep one authenticated WebSocket open
+    /// while all three human-like fixtures take separate turns. This verifies
+    /// normal workout usage without making an ephemeral test tunnel perform
+    /// three unrelated handshakes.
+    func testLiveRealtimeAcceptsAllVoiceFixturesInOneSession() throws {
+        guard ProcessInfo.processInfo.environment["VANCE_RUN_LIVE_SIMULATION"] == "1" else {
+            throw XCTSkip("Set VANCE_RUN_LIVE_SIMULATION=1 with Gateway 8787 running")
+        }
+
+        let app = XCUIApplication()
+        app.launchArguments += ["-live-audio-fixture", "-live", "-route", "/workout/strength"]
+        app.launch()
+
+        try waitForLiveRealtime(in: app)
+        let coachMessages = app.staticTexts.matching(identifier: "realtime-coach-message")
+        for (index, resource) in ["01_back", "02_tired", "03_giveup"].enumerated() {
+            let fixture = app.buttons["inject-audio-\(resource)"]
+            XCTAssertTrue(fixture.waitForExistence(timeout: 3))
+            fixture.tap()
+
+            let reply = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "count >= %d", index + 1),
+                object: coachMessages
+            )
+            XCTAssertEqual(
+                XCTWaiter.wait(for: [reply], timeout: 25),
+                .completed,
+                "expected MiniMax reply \(index + 1) for \(resource).m4a"
+            )
+        }
+    }
+
+    private func assertLiveAudioFixture(_ resource: String) throws {
+        guard ProcessInfo.processInfo.environment["VANCE_RUN_LIVE_SIMULATION"] == "1" else {
+            throw XCTSkip("Set VANCE_RUN_LIVE_SIMULATION=1 with Gateway 8787 running")
+        }
+
+        let app = XCUIApplication()
+        app.launchArguments += ["-live-audio-fixture", "-live", "-route", "/workout/strength"]
+        app.launch()
+
+        try waitForLiveRealtime(in: app)
+
+        let fixture = app.buttons["inject-audio-\(resource)"]
+        XCTAssertTrue(fixture.waitForExistence(timeout: 3))
+        fixture.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["realtime-coach-message"].waitForExistence(timeout: 25),
+            "expected a real MiniMax reply for \(resource).m4a"
+        )
+    }
+
+    private func waitForLiveRealtime(in app: XCUIApplication) throws {
+        XCTAssertTrue(app.staticTexts["力量陪练"].waitForExistence(timeout: 8))
+        let realtimeStatus = app.staticTexts["realtime-status"]
+        XCTAssertTrue(realtimeStatus.waitForExistence(timeout: 5))
+        let ready = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "按住说话"),
+            object: realtimeStatus
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [ready], timeout: 30),
+            .completed,
+            "Gateway did not finish the WebSocket handshake"
+        )
+    }
+
     func testVoiceTurnsAdjustPrescription() {
         let app = launch(route: "/workout/strength")
 

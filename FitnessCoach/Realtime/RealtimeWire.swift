@@ -17,18 +17,33 @@ enum RealtimeWire {
 
     // MARK: - Outgoing
 
-    /// The gateway currently forwards `session.update` verbatim. The handoff
-    /// wants this collapsed to `vance.session.configure` so the prompt lives
-    /// server-side; until the gateway does that injection, the client sends the
-    /// full session so the audio formats are actually applied.
-    static func sessionUpdate(voice: String) -> [String: Any] {
-        [
-            "type": "session.update",
+    /// Let the gateway own the provider configuration and Vance's instructions.
+    /// Sending MiniMax's `session.update` directly would bypass that boundary
+    /// and create a generic MiniMax session instead of the Vance coach.
+    static func sessionUpdate(
+        voice: String,
+        style: AIStyle,
+        state: CoachContext,
+        memories: [String]
+    ) -> [String: Any] {
+        var statePayload: [String: Any] = [
+            "phase": state.phase,
+            "exercise": state.exercise,
+            "prescription": state.prescription,
+        ]
+        if let value = state.setNumber { statePayload["setNumber"] = value }
+        if let value = state.totalSets { statePayload["totalSets"] = value }
+        if let value = state.venue { statePayload["venue"] = value }
+        if let value = state.elapsedMinutes { statePayload["elapsedMinutes"] = value }
+        if let value = state.targetMinutes { statePayload["targetMinutes"] = value }
+
+        return [
+            "type": "vance.session.configure",
             "session": [
-                "modalities": ["text", "audio"],
-                "voice": voice,
-                "input_audio_format": "pcm16",
-                "output_audio_format": "pcm16",
+                "voiceId": voice,
+                "style": style.rawValue,
+                "state": statePayload,
+                "memories": memories,
             ],
         ]
     }

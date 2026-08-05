@@ -1,8 +1,12 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type { Anthropic } from "@anthropic-ai/sdk";
 import { renderShortlist, type ExerciseRow, type PlanInput, type ValidatedPlan } from "./plan";
 
+// DeepSeek OpenAI-compatible API
+const DEEPSEEK_BASE = "https://api.deepseek.com/v1";
+const DEEPSEEK_MODEL = "deepseek-v4-flash";
+
 /**
- * The coach turn: builds the prompt, calls Claude, streams the reply back as
+ * The coach turn: builds the prompt, calls DeepSeek, streams the reply back as
  * SSE, and surfaces tool calls to the app as `action` events.
  *
  * The app owns conversation state and executes the tools (they mutate local
@@ -62,6 +66,7 @@ const BASE_SYSTEM = `你是一个健身陪练 Agent，在用户训练过程中�
 - 用户要计划、问今天练什么、想换计划时，【立刻调用 generate_plan】。
   不要先反问"练多久""想练哪里"——先给一版完整的，用户不满意会自己说要改。
   反问一句再等用户回答，是错误的行为。
+- 【必须】在 generate_plan 的 title 字段填入计划名称，如「练腿日」「上肢推日」「全身力量」。这个字段不能为空。
 - 默认排 5-6 个力量动作 + 1 个有氧，60 分钟左右。用户明确说了时间再按时间调。
 - exercise_id 只能从工具描述里那份清单复制，绝不自己编。
 - 记忆里的伤病决定了哪些动作不能排。膝盖有问题就不排跳跃和深蹲类。
@@ -258,7 +263,6 @@ export function streamCoachTurn(
     apiKey: string,
     hooks: CoachHooks = {}
 ): Response {
-    const client = new Anthropic({ apiKey });
     const encoder = new TextEncoder();
 
     const body = new ReadableStream<Uint8Array>({
@@ -267,83 +271,98 @@ export function streamCoachTurn(
                 controller.enqueue(encoder.encode(sse(event, data)));
 
             try {
-                const stream = client.messages.stream({
-                    // Cheapest current model. No `output_config.effort` — that
-                    // parameter errors on Haiku 4.5. No `thinking` either:
-                    // adaptive is 4.6+, and Haiku doesn't need it for a
-                    // two-sentence reply.
-                    model: "claude-haiku-4-5",
-                    max_tokens: 1024,
-                    system: buildSystem(request),
-                    tools: request.shortlist?.length
-                        ? [...TOOLS, planTool(request.shortlist)]
-                        : TOOLS,
-                    messages: request.messages,
+                // Build system prompt
+                const systemText = buildSystemText(request);
+
+                // Build messages in OpenAI format. The iOS client keeps
+                // Anthropic-shaped tool_use/tool_result blocks because that was
+                // the original wire contract, so convert both halves explicitly.
+                // Dropping tool_result here makes DeepSeek forget what the App
+                // just changed and contradict the updated weight/exercise.
+                const messages: OpenAIMessage[] = [
+                    { role: "system", content: systemText },
+                    ...openAIMessages(request.messages),
+                ];
+
+                // Build tools in OpenAI format
+                const tools = request.shortlist?.length
+                    ? [...openAITools(), openAIPlanTool(request.shortlist)]
+                    : openAITools();
+
+                const response = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${apiKey}`,
+                    },
+                    body: JSON.stringify({
+                        model: DEEPSEEK_MODEL,
+                        messages,
+                        tools,
+                        max_tokens: 1024,
+                        stream: false,
+                    }),
                 });
 
-                for await (const event of stream) {
-                    if (
-                        event.type === "content_block_delta" &&
-                        event.delta.type === "text_delta"
-                    ) {
-                        send("text", { delta: event.delta.text });
-                    }
-                }
-
-                const message = await stream.finalMessage();
-
-                if (message.stop_reason === "refusal") {
-                    send("refusal", {
-                        category: message.stop_details?.category ?? null,
-                    });
-                    send("done", { stop_reason: "refusal" });
+                if (!response.ok) {
+                    const errText = await response.text();
+                    send("error", { status: response.status, message: "upstream_error" });
                     controller.close();
                     return;
                 }
 
-                // generate_plan runs here rather than on the client: the
-                // catalogue and the database both live on this side.
-                const planCalls = message.content.filter(
-                    (b): b is Anthropic.ToolUseBlock =>
-                        b.type === "tool_use" && b.name === "generate_plan"
-                );
-                for (const call of planCalls) {
-                    const result = hooks.onPlan
-                        ? await hooks.onPlan(call.input as PlanInput)
-                        : ({ ok: false, reason: "服务端未启用计划生成" } as const);
-                    if (result.ok) {
-                        send("plan", result.plan);
-                    } else {
-                        send("plan_error", { reason: result.reason });
+                const result = await response.json() as any;
+                const choice = result.choices?.[0];
+                const replyText = choice?.message?.content ?? "";
+
+                // Stream the text in chunks
+                if (replyText) {
+                    const chunkSize = 4;
+                    for (let i = 0; i < replyText.length; i += chunkSize) {
+                        send("text", { delta: replyText.slice(i, i + chunkSize) });
                     }
                 }
 
-                // Tool inputs are only complete on the final message — emit them
-                // after the text so the app applies a settled payload.
-                for (const block of message.content) {
-                    if (block.type === "tool_use" && block.name !== "generate_plan") {
+                // Handle tool calls
+                const toolCalls = choice?.message?.tool_calls ?? [];
+                for (const tc of toolCalls) {
+                    const name = tc.function?.name;
+                    let input: any = {};
+                    try { input = JSON.parse(tc.function?.arguments ?? "{}"); } catch {}
+
+                    if (name === "generate_plan") {
+                        // Ensure title exists — DeepSeek sometimes omits it
+                        if (!input.title && input.items?.length) {
+                            input.title = "今日训练";
+                        }
+                        const planResult = hooks.onPlan
+                            ? await hooks.onPlan(input as PlanInput)
+                            : ({ ok: false, reason: "服务端未启用计划生成" } as const);
+                        if (planResult.ok) {
+                            send("plan", planResult.plan);
+                        } else {
+                            send("plan_error", { reason: planResult.reason });
+                        }
+                    } else if (name) {
                         send("action", {
-                            id: block.id,
-                            name: block.name,
-                            input: block.input,
+                            id: tc.id,
+                            name,
+                            input,
                         });
                     }
                 }
 
                 send("done", {
-                    stop_reason: message.stop_reason,
+                    stop_reason: choice?.finish_reason ?? "stop",
                     usage: {
-                        input: message.usage.input_tokens,
-                        output: message.usage.output_tokens,
-                        cache_read: message.usage.cache_read_input_tokens ?? 0,
+                        input: result.usage?.prompt_tokens ?? 0,
+                        output: result.usage?.completion_tokens ?? 0,
+                        cache_read: 0,
                     },
                 });
                 controller.close();
             } catch (error) {
-                // Never leak the upstream error body — it can echo request content.
-                const status =
-                    error instanceof Anthropic.APIError ? error.status ?? 500 : 500;
-                send("error", { status, message: describeError(error) });
+                send("error", { status: 500, message: "internal_error" });
                 controller.close();
             }
         },
@@ -358,10 +377,98 @@ export function streamCoachTurn(
     });
 }
 
-function describeError(error: unknown): string {
-    if (error instanceof Anthropic.RateLimitError) return "rate_limited";
-    if (error instanceof Anthropic.AuthenticationError) return "upstream_auth_failed";
-    if (error instanceof Anthropic.APIConnectionError) return "upstream_unreachable";
-    if (error instanceof Anthropic.APIError) return "upstream_error";
-    return "internal_error";
+function buildSystemText(request: CoachRequest): string {
+    return `${BASE_SYSTEM}\n\n语气：${STYLE_INSTRUCTIONS[request.style]}\n\n${describeState(request.state, request.memories, request.history)}`;
+}
+
+type OpenAIMessage =
+    | { role: "system" | "user"; content: string }
+    | {
+        role: "assistant";
+        content: string | null;
+        tool_calls?: Array<{
+            id: string;
+            type: "function";
+            function: { name: string; arguments: string };
+        }>;
+    }
+    | { role: "tool"; tool_call_id: string; content: string };
+
+/** Preserve text and the complete tool loop when crossing wire formats. */
+function openAIMessages(messages: Anthropic.MessageParam[]): OpenAIMessage[] {
+    const converted: OpenAIMessage[] = [];
+
+    for (const message of messages) {
+        if (typeof message.content === "string") {
+            converted.push({ role: message.role, content: message.content });
+            continue;
+        }
+
+        const blocks = message.content as any[];
+        const text = blocks
+            .filter((block) => block.type === "text" && typeof block.text === "string")
+            .map((block) => block.text)
+            .join("");
+
+        if (message.role === "assistant") {
+            const toolCalls = blocks
+                .filter((block) => block.type === "tool_use")
+                .map((block) => ({
+                    id: String(block.id),
+                    type: "function" as const,
+                    function: {
+                        name: String(block.name),
+                        arguments: JSON.stringify(block.input ?? {}),
+                    },
+                }));
+            if (text || toolCalls.length) {
+                converted.push({
+                    role: "assistant",
+                    content: text || null,
+                    ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
+                });
+            }
+            continue;
+        }
+
+        // OpenAI requires tool results immediately after the assistant's tool
+        // call. Any user text from the same Anthropic message follows them.
+        for (const block of blocks.filter((item) => item.type === "tool_result")) {
+            const content =
+                typeof block.content === "string"
+                    ? block.content
+                    : JSON.stringify(block.content ?? "");
+            converted.push({
+                role: "tool",
+                tool_call_id: String(block.tool_use_id),
+                content,
+            });
+        }
+        if (text) converted.push({ role: "user", content: text });
+    }
+
+    return converted;
+}
+
+function openAITools() {
+    return TOOLS.map((t: any) => ({
+        type: "function",
+        function: {
+            name: t.name,
+            description: t.description,
+            parameters: t.input_schema,
+        },
+    }));
+}
+
+function openAIPlanTool(shortlist: ExerciseRow[]) {
+    const pt = planTool(shortlist) as any;
+    return {
+        type: "function",
+        function: {
+            name: pt.name,
+            description: pt.description,
+            parameters: pt.input_schema,
+        },
+    };
 }

@@ -66,13 +66,24 @@ final class RealtimeAudioEngine {
 
         let session = AVAudioSession.sharedInstance()
         do {
-            // .voiceChat gives us the echo-cancelled input path and routes to
-            // the speaker rather than the earpiece.
+            // The simulator's `voiceChat` I/O unit can expose a zero-Hz input
+            // even after microphone permission is granted. Use its stable
+            // regular record/playback route; physical devices retain the
+            // echo-cancelled voice-chat path below.
+            #if targetEnvironment(simulator)
+            try session.setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [.defaultToSpeaker])
+            #else
+            // .voiceChat gives a physical device an echo-cancelled input path
+            // and routes to the speaker rather than the earpiece.
             try session.setCategory(
                 .playAndRecord,
                 mode: .voiceChat,
                 options: [.defaultToSpeaker, .allowBluetooth])
             try session.setPreferredSampleRate(RealtimeWire.sampleRate)
+            #endif
             try session.setActive(true, options: [])
         } catch {
             throw Failure.sessionUnavailable(error.localizedDescription)
@@ -129,10 +140,16 @@ final class RealtimeAudioEngine {
         guard isRunning, !isCapturing else { return }
 
         let input = engine.inputNode
-        let inputFormat = input.outputFormat(forBus: 0)
-        // A zero sample rate means the input hardware never came up (simulator
-        // without a mic, or a route change mid-start). Bail rather than install
-        // a tap that will trap in AVAudioConverter.
+        let outputFormat = input.outputFormat(forBus: 0)
+        // Simulator I/O sometimes reports 0 Hz on the input node's output
+        // scope while its hardware input scope is already valid. A physical
+        // device normally reports the same format for both, so prefer output
+        // and use hardware input only as that simulator fallback.
+        let hardwareInputFormat = input.inputFormat(forBus: 0)
+        let inputFormat = outputFormat.sampleRate > 0 ? outputFormat : hardwareInputFormat
+        // A zero sample rate on both scopes means the input hardware never
+        // came up (no mic, or a route change mid-start). Bail rather than
+        // install a tap that will trap in AVAudioConverter.
         guard inputFormat.sampleRate > 0 else {
             throw Failure.sessionUnavailable("麦克风输入格式不可用")
         }
@@ -143,20 +160,29 @@ final class RealtimeAudioEngine {
         }
 
         transcriptionTask?.cancel()
-        let transcriptionRequest = SFSpeechAudioBufferRecognitionRequest()
-        transcriptionRequest.shouldReportPartialResults = true
-        if let speechRecognizer {
-            transcriptionRequest.requiresOnDeviceRecognition =
-                speechRecognizer.supportsOnDeviceRecognition
-        }
-        self.transcriptionRequest = transcriptionRequest
-        transcriptionTask = speechRecognizer?.recognitionTask(with: transcriptionRequest) {
-            result, error in
-            if let result {
-                onTranscript(result.bestTranscription.formattedString, result.isFinal)
-            } else if error != nil {
-                onTranscript("", true)
+        // Local partial transcription improves perceived responsiveness, but
+        // MiniMax also returns the authoritative transcript. Do not make the
+        // whole realtime path depend on the optional Speech permission.
+        let localTranscriptionRequest: SFSpeechAudioBufferRecognitionRequest?
+        if SFSpeechRecognizer.authorizationStatus() == .authorized,
+            let speechRecognizer
+        {
+            let request = SFSpeechAudioBufferRecognitionRequest()
+            request.shouldReportPartialResults = true
+            request.requiresOnDeviceRecognition = speechRecognizer.supportsOnDeviceRecognition
+            self.transcriptionRequest = request
+            transcriptionTask = speechRecognizer.recognitionTask(with: request) { result, error in
+                if let result {
+                    onTranscript(result.bestTranscription.formattedString, result.isFinal)
+                } else if error != nil {
+                    onTranscript("", true)
+                }
             }
+            localTranscriptionRequest = request
+        } else {
+            self.transcriptionRequest = nil
+            transcriptionTask = nil
+            localTranscriptionRequest = nil
         }
 
         // 100 ms of input audio per callback. The tap size is a hint — CoreAudio
@@ -164,7 +190,7 @@ final class RealtimeAudioEngine {
         // buffer we actually receive.
         let tapSize = AVAudioFrameCount(inputFormat.sampleRate / 10)
         input.installTap(onBus: 0, bufferSize: tapSize, format: inputFormat) { buffer, _ in
-            transcriptionRequest.append(buffer)
+            localTranscriptionRequest?.append(buffer)
             guard let chunk = Self.convert(buffer, with: converter, to: self.wireFormat) else {
                 return
             }
@@ -231,6 +257,58 @@ final class RealtimeAudioEngine {
         }
         return Data(bytes: samples[0], count: Int(output.frameLength) * MemoryLayout<Int16>.size)
     }
+
+    #if DEBUG
+    /// Decodes a bundled QA clip into the same 24 kHz mono PCM16 bytes emitted
+    /// by the microphone tap. Keeping conversion here prevents the test source
+    /// from inventing a second wire format.
+    static func decodeTestAudio(at url: URL) -> Data? {
+        guard let file = try? AVAudioFile(forReading: url), file.length > 0,
+            let source = AVAudioPCMBuffer(
+                pcmFormat: file.processingFormat,
+                frameCapacity: AVAudioFrameCount(file.length))
+        else { return nil }
+
+        do {
+            try file.read(into: source)
+        } catch {
+            return nil
+        }
+        guard source.frameLength > 0,
+            let target = AVAudioFormat(
+                commonFormat: .pcmFormatInt16,
+                sampleRate: RealtimeWire.sampleRate,
+                channels: 1,
+                interleaved: true),
+            let converter = AVAudioConverter(from: file.processingFormat, to: target)
+        else { return nil }
+
+        let ratio = target.sampleRate / file.processingFormat.sampleRate
+        let capacity = AVAudioFrameCount((Double(source.frameLength) * ratio).rounded(.up)) + 64
+        guard let output = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else {
+            return nil
+        }
+
+        var consumed = false
+        var conversionError: NSError?
+        converter.convert(to: output, error: &conversionError) { _, status in
+            if consumed {
+                status.pointee = .endOfStream
+                return nil
+            }
+            consumed = true
+            status.pointee = .haveData
+            return source
+        }
+
+        guard conversionError == nil, output.frameLength > 0,
+            let samples = output.int16ChannelData
+        else { return nil }
+        return Data(
+            bytes: samples[0],
+            count: Int(output.frameLength) * MemoryLayout<Int16>.size)
+    }
+    #endif
 
     // MARK: - Playback
 

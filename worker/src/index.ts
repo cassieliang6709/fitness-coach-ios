@@ -1,11 +1,11 @@
 /**
  * Fitness coach API — Cloudflare Worker.
  *
- * Exists so the Anthropic key never ships inside the iOS app. Anything in an
+ * Exists so provider keys never ship inside the iOS app. Anything in an
  * App Store binary can be extracted; a Worker secret cannot.
  *
  * Step 1 (this file): auth + health check only. Deploy it, confirm both
- * secrets are wired, then the Claude endpoint gets added on top.
+ * secrets are wired, then the coaching endpoint gets added on top.
  */
 
 import { streamCoachTurn, type AIStyle, type CoachRequest } from "./coach";
@@ -25,8 +25,8 @@ import {
 export interface Env {
     /** D1: the shared source of truth for both clients. */
     DB: D1Database;
-    /** Anthropic API key. Set via: wrangler secret put ANTHROPIC_API_KEY */
-    ANTHROPIC_API_KEY: string;
+    /** DeepSeek API key. Set via: wrangler secret put DEEPSEEK_API_KEY */
+    DEEPSEEK_API_KEY: string;
     /** Shared secret the iOS app sends. Set via: wrangler secret put APP_SHARED_SECRET */
     APP_SHARED_SECRET: string;
     /** Kimi vision key. Set via: wrangler secret put KIMI_API_KEY */
@@ -136,7 +136,7 @@ export default {
             return json({
                 ok: true,
                 // Presence only. The key itself is never returned, logged, or echoed.
-                anthropicKeyConfigured: Boolean(env.ANTHROPIC_API_KEY),
+                deepseekKeyConfigured: Boolean(env.DEEPSEEK_API_KEY),
                 minimaxKeyConfigured: Boolean(env.MINIMAX_API_KEY),
                 time: new Date().toISOString(),
             });
@@ -171,7 +171,7 @@ export default {
                 perBucket: 6,
             });
 
-            return streamCoachTurn(payload, env.ANTHROPIC_API_KEY, {
+            return streamCoachTurn(payload, env.DEEPSEEK_API_KEY, {
                 onPlan: async (plan) => {
                     const checked = await validatePlan(env, plan);
                     if (!checked.ok) return { ok: false, reason: checked.reason };
