@@ -27,11 +27,15 @@ final class CoachSpeechPlayer {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
         try session.setActive(true)
+        let route = session.currentRoute.outputs.first?.portType.rawValue ?? "none"
+        CoachLog.voice.info(
+            "session: \(session.category.rawValue) → \(route) @ \(session.outputVolume)")
 
         let next: AVAudioPlayer
         do {
             next = try AVAudioPlayer(data: data)
         } catch {
+            CoachLog.voice.error("decode failed: \(String(describing: error))")
             deactivateSession()
             throw Failure.invalidAudio
         }
@@ -39,9 +43,11 @@ final class CoachSpeechPlayer {
         player = next
 
         guard next.play() else {
+            CoachLog.voice.error("play() refused")
             stop()
             throw Failure.playbackUnavailable
         }
+        CoachLog.voice.info("playing: \(next.duration)s vol=\(next.volume)")
 
         do {
             while next.isPlaying {
