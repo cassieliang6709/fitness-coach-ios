@@ -72,7 +72,7 @@ struct ExerciseLibraryView: View {
                 style: .large,
                 onBack: { path.removeLast() }
             ) {
-                RiveMascot(pose: .dumbbell, size: 76)
+                Mascot(pose: .dumbbell, size: 76)
             }
 
             ScrollView {
@@ -269,7 +269,11 @@ private struct ServerExerciseLibraryCard: View {
         Button(action: onToggle) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .center, spacing: 12) {
-                    Mascot(pose: .dumbbell, size: 62)
+                    ExerciseArtwork(
+                        exerciseID: exercise.id,
+                        name: exercise.displayName,
+                        size: 62
+                    )
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(exercise.displayName)

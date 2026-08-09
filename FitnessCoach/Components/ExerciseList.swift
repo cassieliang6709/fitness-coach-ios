@@ -43,6 +43,10 @@ struct ExerciseRow: View {
                 .frame(width: 20, height: 20)
                 .background(Circle().fill(Theme.lightOrange))
 
+            if let definition = ExerciseCatalog.exercise(id: exercise.id) {
+                ExerciseArtwork(exercise: definition, size: 40)
+            }
+
             VStack(alignment: .leading, spacing: 3) {
                 Text(exercise.name)
                     .font(Theme.bodyStrong)

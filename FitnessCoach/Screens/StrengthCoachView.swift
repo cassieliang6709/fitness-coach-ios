@@ -22,6 +22,7 @@ struct StrengthCoachView: View {
                 progressLabel: session.setProgressLabel,
                 secondaryLabel: session.exerciseProgressLabel,
                 venue: session.trainingVenue,
+                exerciseID: session.currentExercise.id,
                 pose: session.isResting ? .drink : .dumbbell
             ) {
                 accessory

@@ -9,6 +9,7 @@ struct CurrentTaskCard<Accessory: View>: View {
     var secondaryLabel: String?
     var progress: Double?
     var venue: String?
+    var exerciseID: String?
     var pose: MascotPose = .idle
     @ViewBuilder var accessory: Accessory
 
@@ -35,7 +36,13 @@ struct CurrentTaskCard<Accessory: View>: View {
 
                 Spacer(minLength: 8)
 
-                Mascot(pose: pose, size: 30)
+                if let exerciseID,
+                    let definition = ExerciseCatalog.exercise(id: exerciseID)
+                {
+                    ExerciseArtwork(exercise: definition, size: 44)
+                } else {
+                    Mascot(pose: pose, size: 30)
+                }
             }
 
             HStack(spacing: 8) {
@@ -76,6 +83,7 @@ extension CurrentTaskCard where Accessory == EmptyView {
         secondaryLabel: String? = nil,
         progress: Double? = nil,
         venue: String? = nil,
+        exerciseID: String? = nil,
         pose: MascotPose = .idle
     ) {
         self.init(
@@ -85,6 +93,7 @@ extension CurrentTaskCard where Accessory == EmptyView {
             secondaryLabel: secondaryLabel,
             progress: progress,
             venue: venue,
+            exerciseID: exerciseID,
             pose: pose,
             accessory: { EmptyView() }
         )

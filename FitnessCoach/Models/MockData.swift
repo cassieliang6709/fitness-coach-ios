@@ -28,7 +28,7 @@ enum MockData {
 
     /// Title / subtitle for each question in the welcome flow.
     static let welcomeSteps: [(title: String, subtitle: String)] = [
-        ("先认识一下", "我是你的 AI 陪练。训练时你说话，我改计划。"),
+        ("Vance - 健身搭子", "基于你的倾向和健身环境，陪你健身并适时引导。"),
         ("你想练成什么样？", "决定动作的重量、次数和有氧比例。"),
         ("平时在哪训练？", "决定我给你安排哪些器械。"),
         ("身体有需要避开的地方吗？", "可多选。这条会一直生效，优先级高于计划。"),

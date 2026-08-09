@@ -75,7 +75,7 @@ struct ExerciseDetailView: View {
 
     private func identityCard(_ exercise: ExerciseDefinition) -> some View {
         HStack(spacing: 14) {
-            Mascot(pose: exercise.mascotPose, size: 78)
+            ExerciseArtwork(exercise: exercise, size: 78)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(exercise.englishName)
@@ -131,7 +131,11 @@ struct ExerciseDetailView: View {
 
     private func remoteIdentityCard(_ exercise: Exercise) -> some View {
         HStack(spacing: 14) {
-            Mascot(pose: .dumbbell, size: 78)
+            ExerciseArtwork(
+                exerciseID: exercise.id,
+                name: exercise.name,
+                size: 78
+            )
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("云端动作库")
@@ -156,7 +160,11 @@ struct ExerciseDetailView: View {
 
     private func catalogIdentityCard(_ exercise: ExerciseCatalogItem) -> some View {
         HStack(spacing: 14) {
-            Mascot(pose: .dumbbell, size: 78)
+            ExerciseArtwork(
+                exerciseID: exercise.id,
+                name: exercise.displayName,
+                size: 78
+            )
 
             VStack(alignment: .leading, spacing: 6) {
                 if !exercise.englishName.isEmpty {

@@ -22,7 +22,7 @@ targets:
     info:
       path: FitnessCoach/Info.plist
       properties:
-        CFBundleDisplayName: AI 健身教练
+        CFBundleDisplayName: Vance - 健身搭子
         UILaunchScreen:
           UIColorName: ""
         UIRequiresFullScreen: true
