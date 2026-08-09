@@ -196,6 +196,31 @@ final class WorkoutFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["注意事项"].exists)
     }
 
+    func testVanceLabCompletesDayOneAndUnlocksDayTwo() {
+        let app = launch()
+
+        app.buttons["实验室"].waitAndTap()
+        XCTAssertTrue(app.otherElements["lab-home"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["先看懂健身房"].exists)
+
+        app.buttons["开始今天的实验"].waitAndTap()
+        XCTAssertTrue(app.otherElements["lab-lesson-1"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["陌生器械只问三个问题"].exists)
+
+        app.buttons["lab-next"].waitAndTap()
+        app.buttons["lab-choice-完整插进去"].waitAndTap()
+        app.buttons["lab-next"].waitAndTap()
+        app.buttons["lab-next"].waitAndTap()
+        app.buttons["lab-choice-20 lb 和 20 kg 不一样重"].waitAndTap()
+        app.buttons["lab-next"].waitAndTap()
+
+        XCTAssertTrue(app.staticTexts["你学会了读懂陌生器械"].waitForExistence(timeout: 3))
+        app.buttons["lab-next"].waitAndTap()
+
+        XCTAssertTrue(app.staticTexts["今天：找到你的胸"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Day 2 of 7"].exists)
+    }
+
     func testDrawsThreeExercisesAndStartsCoaching() {
         let app = launch()
 

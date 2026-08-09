@@ -18,6 +18,9 @@ enum Theme {
     // from every accent on the page, and red would overstate a dropped request.
     static let warning = Color(hex: 0xB45309)
     static let warningTint = Color(hex: 0xFEF6E7)
+    static let labBackground = Color(hex: 0xFFFCF8)
+    static let labBlue = Color(hex: 0x2563EB)
+    static let labHighlight = Color(hex: 0xFFF45C)
 
     // MARK: - Metrics
 

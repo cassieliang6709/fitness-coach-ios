@@ -3,10 +3,11 @@ import SwiftUI
 
 /// /home — the app's root after onboarding.
 ///
-/// Three capsule tabs over one page: talk to the coach, manage today's plan,
-/// or learn the 50-movement library through swipeable cards.
+/// Four capsule tabs over one page: learn in Vance Lab, talk to the coach,
+/// manage today's plan, or explore the movement library.
 struct HomeView: View {
     @Environment(WorkoutSession.self) private var session
+    @Environment(LabProgress.self) private var labProgress
     @Environment(\.workoutStore) private var store
     @Binding var path: [Route]
 
@@ -32,17 +33,23 @@ struct HomeView: View {
 
     var body: some View {
         MobileAppShell {
-            PageHeader(title: headerTitle, subtitle: subtitle) {
-                Mascot(pose: headerPose, size: 42)
-            }
+            if tab == .lab {
+                LabHomeView(path: $path)
+            } else {
+                PageHeader(title: headerTitle, subtitle: subtitle) {
+                    Mascot(pose: headerPose, size: 42)
+                }
 
-            switch tab {
-            case .chat:
-                HomeChatTab(thread: session.daily, path: $path)
-            case .plan:
-                HomePlanTab(path: $path)
-            case .learn:
-                ExerciseHubTab(path: $path)
+                switch tab {
+                case .chat:
+                    HomeChatTab(thread: session.daily, path: $path)
+                case .plan:
+                    HomePlanTab(path: $path)
+                case .learn:
+                    ExerciseHubTab(path: $path)
+                case .lab:
+                    EmptyView()
+                }
             }
         } bottom: {
             HomeBottomBar(tab: $tab) {
@@ -63,6 +70,10 @@ struct HomeView: View {
                             Task { await session.syncPlan(generateIfMissing: true) }
                         }
                     }
+                case .lab:
+                    PrimaryButton(title: labButtonTitle) {
+                        openCurrentLab()
+                    }
                 case .learn:
                     EmptyView()
                 }
@@ -81,6 +92,7 @@ struct HomeView: View {
         switch tab {
         case .chat: return .listening
         case .plan: return .idle
+        case .lab: return .point
         case .learn: return .point
         }
     }
@@ -103,8 +115,26 @@ struct HomeView: View {
             return "今天想练点什么？说一句就行。"
         case .plan:
             return store?.profile()?.summary ?? "今天的安排和你的记录"
+        case .lab:
+            return ""
         case .learn:
             return "拍下器械，挑 3–6 个动作直接开练"
+        }
+    }
+
+    private var labButtonTitle: String {
+        if labProgress.isCourseComplete { return "查看 Gym License" }
+        if labProgress.currentDay == 7 { return "开始 Final Lab" }
+        return "开始今天的实验"
+    }
+
+    private func openCurrentLab() {
+        if labProgress.isCourseComplete {
+            path.append(.labLicense)
+        } else if labProgress.currentDay == 7 {
+            path.append(.finalLab)
+        } else {
+            path.append(.labLesson(labProgress.currentDay))
         }
     }
 }

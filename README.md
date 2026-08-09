@@ -2,27 +2,44 @@
 
 基于你的倾向和健身环境，陪你健身并适时引导。
 
-SwiftUI iOS app. One complete module of the product, not the whole app:
+SwiftUI iOS app with an AI coach, training plan, exercise library, and a
+seven-day interactive gym-learning course:
 
 ```
 /welcome → /home → /plans → /plans/leg-day
                  → /exercises
                  → /workout/strength → /workout/cardio → /workout/review
+                 → /lab/1 … /lab/6 → /lab/final → /lab/license
 ```
 
 `/welcome` runs once, for a user with no stored profile. Its four questions
 (目标 / 场地 / 身体状况 / AI 风格) are written straight into the memory table, so
 the coach's first line already reflects them.
 
-`/home` is the root afterwards — one page, two capsule tabs:
+`/home` is the root afterwards — one page, four capsule tabs:
 
 | Tab | Contents |
 | --- | --- |
 | 对话 | The daily coach thread, suggestion chips, compact text + mic bar |
 | 我的计划 | Today's plan, this week's stripe, streak / totals, memory chips, recent sessions, tone picker |
+| 动作库 | Searchable, safety-filtered exercise catalogue |
+| 实验室 | Seven short lessons that turn gym knowledge into a personal first workout |
 
-Both tabs share the header and the floating tab capsule, so switching reads as
-one place rather than two screens. `我的计划` is the default tab.
+The four areas share the floating tab capsule. `我的计划` is the default tab;
+the Lab uses its own science-notebook header and persistent lesson progress.
+
+## Vance Lab
+
+Vance Lab follows a `predict → try → observe → explain → apply` loop. Days
+1–6 cover gym orientation, chest, back, knees and hips, load selection, and
+machine adjustment. Day 7 asks the learner to diagnose Alex's draft and build
+a balanced Push / Pull / Legs / Hip workout before earning a Level 1 Gym
+License.
+
+- Course manuscript: `docs/vance-lab-course-v1.md`
+- Reusable build workflow: `docs/product-build-workflow.md`
+- Selected visual direction: `docs/references/vance-lab-selected.png`
+- Lab progress is stored locally in `UserDefaults` and survives relaunches.
 
 ## Run
 
@@ -55,6 +72,10 @@ Jump straight to a screen without walking the flow:
 ```bash
 xcrun simctl launch booted com.cassie.fitnesscoach -route /workout/strength
 ```
+
+Lab routes use `/lab/1` through `/lab/6`, `/lab/final`, and `/lab/license`.
+During DEBUG runs, `-home-tab lab -lab-day 2` opens the Lab and seeds Day 2 as
+the current unlocked lesson.
 
 `-route` implies an existing user, so it seeds a demo profile and skips the
 welcome flow. To skip it without deep-linking, pass `-onboarded`; to see the

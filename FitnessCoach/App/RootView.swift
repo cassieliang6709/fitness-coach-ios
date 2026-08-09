@@ -7,6 +7,9 @@ enum Route: Hashable {
     case plans
     case exerciseLibrary
     case exerciseDetail(String)
+    case labLesson(Int)
+    case finalLab
+    case labLicense
     case legDay
     case strength
     case cardio
@@ -19,6 +22,9 @@ enum Route: Hashable {
         case .plans: return "/plans"
         case .exerciseLibrary: return "/exercises"
         case .exerciseDetail(let id): return "/exercises/\(id)"
+        case .labLesson(let day): return "/lab/\(day)"
+        case .finalLab: return "/lab/final"
+        case .labLicense: return "/lab/license"
         case .legDay: return "/plans/leg-day"
         case .strength: return "/workout/strength"
         case .cardio: return "/workout/cardio"
@@ -28,6 +34,21 @@ enum Route: Hashable {
     }
 
     init?(path: String) {
+        if path == "/lab/final" {
+            self = .finalLab
+            return
+        }
+        if path == "/lab/license" {
+            self = .labLicense
+            return
+        }
+        if path.hasPrefix("/lab/"),
+            let day = Int(path.dropFirst("/lab/".count)),
+            (1...6).contains(day)
+        {
+            self = .labLesson(day)
+            return
+        }
         if path.hasPrefix("/exercises/"), path.count > "/exercises/".count {
             self = .exerciseDetail(String(path.dropFirst("/exercises/".count)))
             return
@@ -37,7 +58,8 @@ enum Route: Hashable {
     }
 
     static let all: [Route] = [
-        .home, .plans, .exerciseLibrary, .legDay, .strength, .cardio, .review, .riveLab,
+        .home, .plans, .exerciseLibrary, .labLesson(1), .finalLab, .labLicense,
+        .legDay, .strength, .cardio, .review, .riveLab,
     ]
 }
 
@@ -46,6 +68,7 @@ struct RootView: View {
     let store: WorkoutStore
 
     @State private var path: [Route] = []
+    @State private var labProgress: LabProgress
     /// A stored profile means the welcome flow is done. Held in state so
     /// finishing onboarding swaps the root without a relaunch.
     @State private var onboarded: Bool
@@ -54,6 +77,7 @@ struct RootView: View {
         self.session = session
         self.store = store
         _onboarded = State(initialValue: store.hasProfile)
+        _labProgress = State(initialValue: LabProgress())
     }
 
     var body: some View {
@@ -69,6 +93,12 @@ struct RootView: View {
                         ExerciseLibraryView(path: $path)
                     case .exerciseDetail(let id):
                         ExerciseDetailView(exerciseID: id, path: $path)
+                    case .labLesson(let day):
+                        LabLessonView(day: day, path: $path)
+                    case .finalLab:
+                        FinalLabView(path: $path)
+                    case .labLicense:
+                        LabLicenseView(path: $path)
                     case .legDay:
                         LegDayDetailView(path: $path)
                     case .strength:
@@ -83,6 +113,7 @@ struct RootView: View {
                 }
         }
         .environment(session)
+        .environment(labProgress)
         .environment(\.workoutStore, store)
         .tint(Theme.primary)
         .preferredColorScheme(.light)
