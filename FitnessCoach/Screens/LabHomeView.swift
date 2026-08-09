@@ -39,7 +39,7 @@ struct LabHomeView: View {
                 hero
 
                 VStack(alignment: .leading, spacing: 10) {
-                    LabNotebookLabel(text: lesson.day == 2 ? "今天的假设" : "CURRENT STUDY")
+                    LabNotebookLabel(text: "CURRENT STUDY")
 
                     Text(lesson.subtitle)
                         .font(.system(size: 22, weight: .bold))
@@ -48,7 +48,7 @@ struct LabHomeView: View {
                     Text(
                         progress.isCourseComplete
                             ? "七个 Lab 已完成。你的第一份训练计划已经准备好了。"
-                            : "完成真实观察，才会点亮今天的研究区域。"
+                            : "完成后解锁：\(lesson.unlock)"
                     )
                     .font(Theme.body)
                     .foregroundStyle(Theme.secondaryText)
@@ -80,9 +80,13 @@ struct LabHomeView: View {
 
     @ViewBuilder
     private var hero: some View {
-        if lesson.day == 2 || progress.isCourseComplete {
+        if lesson.day == 3 || progress.isCourseComplete {
             LabBodyMap(compact: true)
                 .frame(height: 286)
+        } else if lesson.day == 6 {
+            Mascot(pose: .jogging, size: 210)
+                .frame(maxWidth: .infinity)
+                .frame(height: 260)
         } else if let exercise = heroExercise {
             ExerciseArtwork(exercise: exercise, size: 230)
                 .frame(maxWidth: .infinity)
@@ -97,10 +101,9 @@ struct LabHomeView: View {
     private var heroExercise: ExerciseDefinition? {
         let id: String
         switch lesson.day {
-        case 1: id = "machine-chest-press"
-        case 3: id = "lat-pulldown"
+        case 2: id = "machine-chest-press"
         case 4: id = "leg-press"
-        case 5: id = "seated-cable-row"
+        case 5: id = "machine-chest-press"
         default: return nil
         }
         return ExerciseCatalog.exercise(id: id)

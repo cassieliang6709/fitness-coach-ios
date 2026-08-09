@@ -37,7 +37,7 @@ struct LabLessonView: View {
                         .foregroundStyle(Theme.mainText)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text(step.body)
+                    Text(resolved(step.body))
                         .font(.system(size: 17))
                         .foregroundStyle(Theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -98,9 +98,15 @@ struct LabLessonView: View {
 
     @ViewBuilder
     private var artwork: some View {
-        if day == 2 && step.id == "human" {
+        if day == 3 && step.id == "push-human" {
             LabBodyMap(compact: true)
                 .frame(height: 300)
+        } else if day == 3 && step.id == "pull-human",
+            let exercise = ExerciseCatalog.exercise(id: "lat-pulldown")
+        {
+            ExerciseArtwork(exercise: exercise, size: 220)
+                .frame(maxWidth: .infinity)
+                .frame(height: 236)
         } else if let id = step.exerciseID,
             let exercise = ExerciseCatalog.exercise(id: id)
         {
@@ -117,15 +123,14 @@ struct LabLessonView: View {
     private var bullets: some View {
         if !step.bullets.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(Array(step.bullets.enumerated()), id: \.offset) { index, bullet in
+                ForEach(Array(step.bullets.enumerated()), id: \.offset) { _, bullet in
                     HStack(alignment: .top, spacing: 10) {
-                        Text("\(index + 1)")
-                            .font(.system(size: 11, weight: .bold))
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 7, weight: .bold))
                             .foregroundStyle(Theme.primary)
                             .frame(width: 22, height: 22)
-                            .background(Circle().fill(Theme.lightOrange))
 
-                        Text(bullet)
+                        Text(resolved(bullet))
                             .font(Theme.body)
                             .foregroundStyle(Theme.mainText)
                             .fixedSize(horizontal: false, vertical: true)
@@ -161,7 +166,7 @@ struct LabLessonView: View {
         {
             HStack(alignment: .top, spacing: 10) {
                 Mascot(pose: .listening, size: 38)
-                Text(message)
+                Text(resolved(message))
                     .font(Theme.body)
                     .foregroundStyle(Theme.mainText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -191,5 +196,13 @@ struct LabLessonView: View {
             progress.complete(day: day)
             path.removeLast()
         }
+    }
+
+    private func resolved(_ copy: String) -> String {
+        copy
+            .replacingOccurrences(of: "{leadGoal}", with: progress.leadGoal)
+            .replacingOccurrences(of: "{supportGoal}", with: progress.supportGoal)
+            .replacingOccurrences(of: "{availability}", with: progress.availability)
+            .replacingOccurrences(of: "{evidence}", with: progress.successEvidence)
     }
 }

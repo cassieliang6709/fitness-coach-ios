@@ -30,13 +30,13 @@ the Lab uses its own science-notebook header and persistent lesson progress.
 
 ## Vance Lab
 
-Vance Lab follows a `predict → try → observe → explain → apply` loop. Days
-1–6 cover gym orientation, chest, back, knees and hips, load selection, and
-machine adjustment. Day 7 asks the learner to diagnose Alex's draft and build
-a balanced Push / Pull / Legs / Hip workout before earning a Level 1 Gym
-License.
+Vance Lab starts with the learner's goal and real weekly availability, then
+moves through gym orientation, Push / Pull, Knee / Hip, training dose, and the
+relationship between strength and cardio. Day 7 asks the learner to diagnose
+Alex's week before building a full week, a busy-week fallback, and Workout A.
 
-- Course manuscript: `docs/vance-lab-course-v1.md`
+- Approved course manuscript: `docs/vance-lab-course-v2.md`
+- Earlier manuscript retained for comparison: `docs/vance-lab-course-v1.md`
 - Reusable build workflow: `docs/product-build-workflow.md`
 - Selected visual direction: `docs/references/vance-lab-selected.png`
 - Lab progress is stored locally in `UserDefaults` and survives relaunches.

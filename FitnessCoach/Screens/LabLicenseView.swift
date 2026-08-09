@@ -22,29 +22,54 @@ struct LabLicenseView: View {
                         .font(.system(size: 42, weight: .black))
                         .foregroundStyle(Theme.mainText)
 
-                    Text("你已经可以开始自己的第一次训练。")
+                    Text("这是你的第一版训练计划。")
                         .font(.system(size: 22, weight: .bold))
                         .multilineTextAlignment(.center)
                         .foregroundStyle(Theme.mainText)
 
-                    Text("你不需要记住所有答案。你已经知道如何观察、如何调整，以及什么时候应该停下来。")
+                    Text("接下来四周，用训练记录看看它是否适合你的时间、目标和恢复情况。动作可以换，忙的时候也可以直接使用短版本。")
                         .font(Theme.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(Theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    if !progress.personalPlan.isEmpty {
+                    if !progress.weeklyPlan.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("你的第一份训练")
+                            Text("你的一周")
                                 .font(Theme.cardTitle)
-                            ForEach(progress.personalPlan, id: \.self) { name in
-                                Label(name, systemImage: "checkmark.circle.fill")
+                            ForEach(progress.weeklyPlan, id: \.self) { item in
+                                Label(item, systemImage: "calendar.badge.checkmark")
                                     .font(Theme.body)
                                     .foregroundStyle(Theme.mainText)
                             }
                         }
+                        .card(filled: Theme.surface)
+                    }
+
+                    if !progress.personalPlan.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Workout A · Full Body")
+                                .font(Theme.cardTitle)
+                            ForEach(progress.personalPlan, id: \.self) { name in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Label(name, systemImage: "checkmark.circle.fill")
+                                        .font(Theme.bodyStrong)
+                                        .foregroundStyle(Theme.mainText)
+                                    Text("2 × 8–12 · 约 2–4 RIR")
+                                        .font(Theme.caption)
+                                        .foregroundStyle(Theme.secondaryText)
+                                        .padding(.leading, 28)
+                                }
+                            }
+                        }
                         .card(filled: Theme.lightOrange)
                     }
+
+                    Text("如果重量让动作提前失控，降低一档或减少次数。出现安全警讯时，停止对应活动。时间不足时先做前面的主要动作，不用加速赶完。")
+                        .font(Theme.caption)
+                        .foregroundStyle(Theme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 6)
                 }
                 .padding(.horizontal, Theme.pagePadding)
                 .padding(.bottom, 24)

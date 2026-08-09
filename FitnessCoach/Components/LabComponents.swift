@@ -132,7 +132,7 @@ struct LabSafetyNote: View {
             Image(systemName: "exclamationmark.shield.fill")
                 .foregroundStyle(Theme.warning)
 
-            Text("只用能轻松控制的重量。出现尖锐疼痛、麻木、明显头晕或失去控制时立即停止。")
+            Text("今天先轻一点。器械卡紧，动作可控；出现尖锐疼痛、麻木、胸痛、明显头晕、异常呼吸困难或失去控制时立即停止。")
                 .font(Theme.caption)
                 .foregroundStyle(Theme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)

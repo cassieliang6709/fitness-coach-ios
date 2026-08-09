@@ -9,12 +9,14 @@ final class LabProgress {
         static let lessonSteps = "vance.lab.lesson-steps"
         static let answers = "vance.lab.answers"
         static let personalPlan = "vance.lab.personal-plan"
+        static let weeklyPlan = "vance.lab.weekly-plan"
     }
 
     private(set) var completedDays: Set<Int>
     private(set) var lessonSteps: [Int: Int]
     private(set) var answers: [String: String]
     private(set) var personalPlan: [String]
+    private(set) var weeklyPlan: [String]
 
     private let defaults: UserDefaults
 
@@ -27,12 +29,14 @@ final class LabProgress {
             defaults.removeObject(forKey: Key.lessonSteps)
             defaults.removeObject(forKey: Key.answers)
             defaults.removeObject(forKey: Key.personalPlan)
+            defaults.removeObject(forKey: Key.weeklyPlan)
         }
 
         completedDays = Set(defaults.array(forKey: Key.completedDays) as? [Int] ?? [])
         lessonSteps = Self.intDictionary(defaults.dictionary(forKey: Key.lessonSteps))
         answers = defaults.dictionary(forKey: Key.answers) as? [String: String] ?? [:]
         personalPlan = defaults.stringArray(forKey: Key.personalPlan) ?? []
+        weeklyPlan = defaults.stringArray(forKey: Key.weeklyPlan) ?? []
 
         #if DEBUG
         if let index = arguments.firstIndex(of: "-lab-day"),
@@ -54,6 +58,20 @@ final class LabProgress {
     }
 
     var masteredCount: Int { completedDays.count }
+
+    var leadGoal: String { answer(lessonDay: 1, stepID: "lead-goal") ?? "建立规律训练" }
+
+    var supportGoal: String {
+        answer(lessonDay: 1, stepID: "support-goal") ?? "日常状态和运动习惯"
+    }
+
+    var availability: String {
+        answer(lessonDay: 1, stepID: "availability") ?? "每周 2 次，每次约 30 分钟"
+    }
+
+    var successEvidence: String {
+        answer(lessonDay: 1, stepID: "evidence") ?? "完成每周计划的大部分内容"
+    }
 
     func isUnlocked(_ day: Int) -> Bool {
         day <= currentDay || completedDays.contains(day)
@@ -88,6 +106,11 @@ final class LabProgress {
         persist()
     }
 
+    func save(weeklyPlan: [String]) {
+        self.weeklyPlan = weeklyPlan
+        persist()
+    }
+
     private func persist() {
         defaults.set(completedDays.sorted(), forKey: Key.completedDays)
         defaults.set(
@@ -96,6 +119,7 @@ final class LabProgress {
         )
         defaults.set(answers, forKey: Key.answers)
         defaults.set(personalPlan, forKey: Key.personalPlan)
+        defaults.set(weeklyPlan, forKey: Key.weeklyPlan)
     }
 
     private static func intDictionary(_ source: [String: Any]?) -> [Int: Int] {
