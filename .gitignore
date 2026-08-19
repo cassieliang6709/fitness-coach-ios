@@ -25,3 +25,10 @@ backend/worker/.dev.vars
 backend/gateway/.env
 backend/gateway/data/
 backend/**/node_modules/
+
+# Local deployment and legacy runtime metadata.
+landing/.vercel/
+worker/.app-secret
+worker/node_modules/
+
+worker/.wrangler/
