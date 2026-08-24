@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0E9943280E6AC19D1DDD69A5 /* 03_giveup.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 2F13885F785BA52741678D71 /* 03_giveup.m4a */; };
 		168E3B6ED12354B41CCADFDA /* WorkoutSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E978E9CEC3D2D0FF70DDD8EF /* WorkoutSession.swift */; };
 		1919BAA9CACE7F394BB378CB /* ChatThread.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0FBB6446BD083F19DF5982A /* ChatThread.swift */; };
 		1DF1DF20F3BFFF5EE4A1B0F8 /* RealtimeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 523D8975A48E49FA15ADE7C4 /* RealtimeSession.swift */; };
@@ -29,9 +30,6 @@
 		5F30982605D19A4277C4DD8D /* CardioCoachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C00A20E3FE5CA88E74CD4EA /* CardioCoachView.swift */; };
 		64957680C0E6BC7E5F3CCC9C /* AIStyleSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 914915B268EE287F23DBF918 /* AIStyleSelector.swift */; };
 		68610DED597F1CD3C4031EAF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1B618CBF39FF185F6B3E9A1B /* Assets.xcassets */; };
-		6A0D1001E45A4C28B5290001 /* 01_back.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 6A0D1001E45A4C28B5290011 /* 01_back.m4a */; };
-		6A0D1001E45A4C28B5290002 /* 02_tired.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 6A0D1001E45A4C28B5290012 /* 02_tired.m4a */; };
-		6A0D1001E45A4C28B5290003 /* 03_giveup.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 6A0D1001E45A4C28B5290013 /* 03_giveup.m4a */; };
 		707850155AACB74E6BC3B4A7 /* WorkoutInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6873837BE6BB59BC6C4B58C /* WorkoutInputBar.swift */; };
 		725A1C0AC05F7207252CEB26 /* RealtimeAudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE17844FDC00B74D0DE4C12E /* RealtimeAudioEngine.swift */; };
 		73641F93C3733087B2B97724 /* WorkoutFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DDD6DAE91577C1405E076F /* WorkoutFlowUITests.swift */; };
@@ -40,6 +38,7 @@
 		7784E73CCA29405FA322657E /* MobileAppShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = F181001AD622C3599406E4F1 /* MobileAppShell.swift */; };
 		7CE62C8AF35FBE84C9F0FE01 /* OptionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24C5A63B0EAE438ED9A218B /* OptionCard.swift */; };
 		84BAA0D35C17D81798D5A915 /* WorkoutStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28A35726AC4C8F78B9B472F7 /* WorkoutStore.swift */; };
+		857ED6A4D7FC85690A1110B9 /* 01_back.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 933EEFE237FEA29E689796AE /* 01_back.m4a */; };
 		91F21F549EF0ED897A3A4585 /* Mascot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 317F95849E3471B16D690E4C /* Mascot.swift */; };
 		94D47636CF2255B287C09EF0 /* ExerciseList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039CDDC6FF8960B651935C04 /* ExerciseList.swift */; };
 		969EFCB37581CFCC247FF7BD /* StrengthCoachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5BAE0DC3EC8704DFEBDBEDD /* StrengthCoachView.swift */; };
@@ -68,6 +67,7 @@
 		EF735AF0079324D3F4101BD7 /* MockData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70A19FD42D2B1266ED635357 /* MockData.swift */; };
 		EFDC024E5C799E29DBB7D1EF /* PlanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29C882A2C23022537AF8DA78 /* PlanCard.swift */; };
 		F1D367A41282EA539E659E14 /* GymVision.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB9C0B2EE58D13298C677F7 /* GymVision.swift */; };
+		F8AC53EA29D85686375AF956 /* 02_tired.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 31C1D40A8CF0DE6094B0EB95 /* 02_tired.m4a */; };
 		FAFC298F1430699ADEBF379B /* ExerciseCatalogWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = A43156F3FBCC6A7941140EA3 /* ExerciseCatalogWire.swift */; };
 		FB5DAD1A355F748FE0B84341 /* CoachThread.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279DE87CE682310E78C9E3E5 /* CoachThread.swift */; };
 		FBDF3C950AACFB21506B21E6 /* InstallIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DAAD536E282B8AA448A8BCC /* InstallIdentity.swift */; };
@@ -91,9 +91,6 @@
 		0EE6F9CFAC97BDD6AE7500AA /* LegDayDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegDayDetailView.swift; sourceTree = "<group>"; };
 		1408723B97FE7F5F6973D66B /* CoachSpeechPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachSpeechPlayer.swift; sourceTree = "<group>"; };
 		1B618CBF39FF185F6B3E9A1B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		6A0D1001E45A4C28B5290011 /* 01_back.m4a */ = {isa = PBXFileReference; lastKnownFileType = audio.m4a; path = 01_back.m4a; sourceTree = "<group>"; };
-		6A0D1001E45A4C28B5290012 /* 02_tired.m4a */ = {isa = PBXFileReference; lastKnownFileType = audio.m4a; path = 02_tired.m4a; sourceTree = "<group>"; };
-		6A0D1001E45A4C28B5290013 /* 03_giveup.m4a */ = {isa = PBXFileReference; lastKnownFileType = audio.m4a; path = 03_giveup.m4a; sourceTree = "<group>"; };
 		1CA518FE2897866F2BCE097C /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		22BE20B857330F9517F95821 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		261FA6B31E54B2A7C8C2C7C6 /* SpeechRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognizer.swift; sourceTree = "<group>"; };
@@ -101,7 +98,9 @@
 		28A35726AC4C8F78B9B472F7 /* WorkoutStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutStore.swift; sourceTree = "<group>"; };
 		29C882A2C23022537AF8DA78 /* PlanCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCard.swift; sourceTree = "<group>"; };
 		2AFFF5FAEBB58488F7494914 /* RealtimeWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeWire.swift; sourceTree = "<group>"; };
+		2F13885F785BA52741678D71 /* 03_giveup.m4a */ = {isa = PBXFileReference; path = 03_giveup.m4a; sourceTree = "<group>"; };
 		317F95849E3471B16D690E4C /* Mascot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mascot.swift; sourceTree = "<group>"; };
+		31C1D40A8CF0DE6094B0EB95 /* 02_tired.m4a */ = {isa = PBXFileReference; path = 02_tired.m4a; sourceTree = "<group>"; };
 		329D1EF386C07A0F49B5C129 /* WorkoutProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutProgress.swift; sourceTree = "<group>"; };
 		3574E651A1A2E3BD1B4CB98F /* RiveLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RiveLabView.swift; sourceTree = "<group>"; };
 		36AF4FE9E68D3BFCE89DBD51 /* PlanCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCache.swift; sourceTree = "<group>"; };
@@ -130,6 +129,7 @@
 		8E0E414C186E95F3E98A78F7 /* Records.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Records.swift; sourceTree = "<group>"; };
 		9005938F3A0D0909538D19A9 /* FitnessCoachApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessCoachApp.swift; sourceTree = "<group>"; };
 		914915B268EE287F23DBF918 /* AIStyleSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIStyleSelector.swift; sourceTree = "<group>"; };
+		933EEFE237FEA29E689796AE /* 01_back.m4a */ = {isa = PBXFileReference; path = 01_back.m4a; sourceTree = "<group>"; };
 		9AFBE4284C22662D41B46887 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9C4E4CDD723E24CEBCA29B3B /* ExerciseLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibraryView.swift; sourceTree = "<group>"; };
 		A0C1263DC430C198B2D6D84E /* GymPhotoScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymPhotoScanner.swift; sourceTree = "<group>"; };
@@ -150,7 +150,7 @@
 		E978E9CEC3D2D0FF70DDD8EF /* WorkoutSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSession.swift; sourceTree = "<group>"; };
 		F181001AD622C3599406E4F1 /* MobileAppShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAppShell.swift; sourceTree = "<group>"; };
 		FB22B9F7B6C288203F121427 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		"TEMP_A703722A-FC7B-4DC4-A910-19E43CDC9E99" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		"TEMP_A375DF4A-93B5-44C0-9AB7-66396CA3D251" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -315,10 +315,10 @@
 			isa = PBXGroup;
 			children = (
 				AEE7F13CCBCF5109ABCC28DA /* Rive */,
+				933EEFE237FEA29E689796AE /* 01_back.m4a */,
+				31C1D40A8CF0DE6094B0EB95 /* 02_tired.m4a */,
+				2F13885F785BA52741678D71 /* 03_giveup.m4a */,
 				1B618CBF39FF185F6B3E9A1B /* Assets.xcassets */,
-				6A0D1001E45A4C28B5290011 /* 01_back.m4a */,
-				6A0D1001E45A4C28B5290012 /* 02_tired.m4a */,
-				6A0D1001E45A4C28B5290013 /* 03_giveup.m4a */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -357,10 +357,10 @@
 			path = DesignSystem;
 			sourceTree = "<group>";
 		};
-		"TEMP_8C631183-43F2-4DDE-A9CE-3D38B66A09E2" /* fitness_plan */ = {
+		"TEMP_5B88DEBA-D13C-4059-9178-61408A3520AC" /* fitness_plan */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_A703722A-FC7B-4DC4-A910-19E43CDC9E99" /* Secrets.xcconfig */,
+				"TEMP_A375DF4A-93B5-44C0-9AB7-66396CA3D251" /* Secrets.xcconfig */,
 			);
 			path = fitness_plan;
 			sourceTree = "<group>";
@@ -452,10 +452,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				857ED6A4D7FC85690A1110B9 /* 01_back.m4a in Resources */,
+				F8AC53EA29D85686375AF956 /* 02_tired.m4a in Resources */,
+				0E9943280E6AC19D1DDD69A5 /* 03_giveup.m4a in Resources */,
 				68610DED597F1CD3C4031EAF /* Assets.xcassets in Resources */,
-				6A0D1001E45A4C28B5290001 /* 01_back.m4a in Resources */,
-				6A0D1001E45A4C28B5290002 /* 02_tired.m4a in Resources */,
-				6A0D1001E45A4C28B5290003 /* 03_giveup.m4a in Resources */,
 				3AE3544EE02441ACA4A57F26 /* LICENSE-RIVE-IOS.txt in Resources */,
 				9D40B84F60235DD4E0FB932A /* README.md in Resources */,
 				E1571016F6252030F3FB0B33 /* rive-skills-demo.riv in Resources */,
@@ -548,7 +548,7 @@
 /* Begin XCBuildConfiguration section */
 		0A5C1E68088CAA6BC11794C2 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_A703722A-FC7B-4DC4-A910-19E43CDC9E99" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_A375DF4A-93B5-44C0-9AB7-66396CA3D251" /* Secrets.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGNING_ALLOWED = NO;
@@ -568,13 +568,13 @@
 		};
 		382A8157C0314B540CAE4CDD /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_A703722A-FC7B-4DC4-A910-19E43CDC9E99" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_A375DF4A-93B5-44C0-9AB7-66396CA3D251" /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = KAR46QR8TU;
+				DEVELOPMENT_TEAM = M7BPQ88622;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = FitnessCoach/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -655,13 +655,13 @@
 		};
 		8DD3C532179EBF0A5669FBA8 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_A703722A-FC7B-4DC4-A910-19E43CDC9E99" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_A375DF4A-93B5-44C0-9AB7-66396CA3D251" /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = KAR46QR8TU;
+				DEVELOPMENT_TEAM = M7BPQ88622;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = FitnessCoach/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -679,7 +679,7 @@
 		};
 		A1C0B32022452E30557BDAF4 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_A703722A-FC7B-4DC4-A910-19E43CDC9E99" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_A375DF4A-93B5-44C0-9AB7-66396CA3D251" /* Secrets.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGNING_ALLOWED = NO;
