@@ -6,9 +6,29 @@ xcuserdata/
 *.xcworkspace/xcuserdata/
 .swiftpm/
 Secrets.xcconfig
+.omx/
 
-# Coach Gateway handoff: keep the write-ups, leave the implementation out.
-# worker/ is the one backend, so the Node server, its scripts, its runtime
-# state and its vendor keys all stay untracked.
+# Historical handoff bundle: keep only its write-ups. The maintained Gateway
+# implementation now lives in vance-gateway/ below.
 Vance_Coach_Gateway_Handoff_20260802/*
 !Vance_Coach_Gateway_Handoff_20260802/*.md
+
+# The realtime Gateway source is versioned, but local credentials and runtime
+# telemetry must never enter Git.
+vance-gateway/.env
+vance-gateway/data/
+vance-gateway/node_modules/
+
+# Vance backend 本地密钥和运行时数据
+backend/.env
+backend/worker/.dev.vars
+backend/gateway/.env
+backend/gateway/data/
+backend/**/node_modules/
+
+# Local deployment and legacy runtime metadata.
+landing/.vercel/
+worker/.app-secret
+worker/node_modules/
+
+worker/.wrangler/

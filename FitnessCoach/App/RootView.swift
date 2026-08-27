@@ -146,7 +146,8 @@ struct RootView: View {
         }
     }
 
-    /// Deep-link straight to a route for screenshotting and manual QA:
+    /// Deep-link straight to a route for screenshotting and manual QA. This
+    /// keeps the selected app mode (live or `-demo`) unchanged:
     /// `xcrun simctl launch booted <id> -route /workout/strength`
     private func applyLaunchRoute() {
         #if DEBUG

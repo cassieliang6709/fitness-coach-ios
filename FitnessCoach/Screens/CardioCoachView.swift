@@ -6,6 +6,8 @@ struct CardioCoachView: View {
     @Binding var path: [Route]
 
     @State private var confirmEnd = false
+    @State private var realtime = RealtimeSession()
+    @State private var realtimeDraft = ""
 
     var body: some View {
         MobileAppShell {
@@ -33,12 +35,16 @@ struct CardioCoachView: View {
                 }
             }
 
-            ChatThread(
-                messages: session.cardio.messages,
-                isTyping: session.cardio.isTyping
-            )
-            .frame(maxHeight: .infinity)
-            .layoutPriority(1)
+            if session.usesDemoData {
+                ChatThread(
+                    messages: session.cardio.messages,
+                    isTyping: session.cardio.isTyping
+                )
+                .frame(maxHeight: .infinity)
+                .layoutPriority(1)
+            } else {
+                RealtimeCoachPanel(session: realtime)
+            }
         } bottom: {
             if session.phase == .cardioComplete {
                 BottomBar {
@@ -48,14 +54,33 @@ struct CardioCoachView: View {
                     }
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-            } else {
+            } else if session.usesDemoData {
                 WorkoutInputBar(thread: session.cardio) {
                     confirmEnd = true
+                }
+            } else {
+                BottomBar {
+                    VStack(spacing: 10) {
+                        RealtimeCoachControls(session: realtime, draft: $realtimeDraft)
+                        Button("结束训练") { confirmEnd = true }
+                            .font(Theme.caption)
+                            .foregroundStyle(Theme.secondaryText)
+                    }
                 }
             }
         }
         .animation(.easeInOut(duration: 0.25), value: session.phase)
-        .onAppear { session.enterCardio() }
+        .onAppear {
+            session.enterCardio()
+            guard !session.usesDemoData else { return }
+            configureRealtime()
+            realtime.connect()
+        }
+        .onChange(of: session.realtimeCoachContext) {
+            guard !session.usesDemoData else { return }
+            configureRealtime()
+        }
+        .onDisappear { realtime.disconnect() }
         .confirmationDialog("结束本次训练？", isPresented: $confirmEnd, titleVisibility: .visible) {
             // Sets are already logged, so ending early goes to the review and
             // reports the partial session rather than discarding it.
@@ -65,5 +90,13 @@ struct CardioCoachView: View {
             }
             Button("继续训练", role: .cancel) {}
         }
+    }
+
+    private func configureRealtime() {
+        realtime.configure(
+            style: session.aiStyle,
+            state: session.realtimeCoachContext,
+            memories: session.realtimeMemories
+        )
     }
 }

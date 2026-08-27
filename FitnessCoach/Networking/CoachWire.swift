@@ -4,9 +4,9 @@ import Foundation
 ///
 /// The app keeps two parallel histories: `ChatMessage` for the bubbles the user
 /// sees, and `WireMessage` for what the API needs — which includes tool_use and
-/// tool_result blocks that never appear on screen. Claude rejects a request
-/// where a tool_use isn't answered by a matching tool_result, so the wire
-/// history can't be reconstructed from the display history.
+/// tool_result blocks that never appear on screen. The Worker translates this
+/// history to DeepSeek's OpenAI-compatible tool-call format, so it cannot be
+/// reconstructed from the display history alone.
 
 // MARK: - Minimal JSON value
 

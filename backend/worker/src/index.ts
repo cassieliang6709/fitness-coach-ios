@@ -1,11 +1,11 @@
 /**
  * Fitness coach API — Cloudflare Worker.
  *
- * Exists so the Anthropic key never ships inside the iOS app. Anything in an
+ * Exists so provider keys never ship inside the iOS app. Anything in an
  * App Store binary can be extracted; a Worker secret cannot.
  *
  * Step 1 (this file): auth + health check only. Deploy it, confirm both
- * secrets are wired, then the Claude endpoint gets added on top.
+ * secrets are wired, then the coaching endpoint gets added on top.
  */
 
 import { streamCoachTurn, type AIStyle, type CoachRequest } from "./coach";
@@ -25,12 +25,16 @@ import {
 export interface Env {
     /** D1: the shared source of truth for both clients. */
     DB: D1Database;
+    /** DeepSeek API key. Set via: wrangler secret put DEEPSEEK_API_KEY */
+    DEEPSEEK_API_KEY: string;
     /** Shared secret the iOS app sends. Set via: wrangler secret put APP_SHARED_SECRET */
     APP_SHARED_SECRET: string;
-    /** Kimi key — coaching turns and vision. Set via: wrangler secret put KIMI_API_KEY */
+    /** Kimi vision key. Set via: wrangler secret put KIMI_API_KEY */
     KIMI_API_KEY: string;
     /** MiniMax speech key. Set via: wrangler secret put MINIMAX_API_KEY */
     MINIMAX_API_KEY: string;
+    /** Private gateway-only credential for the Node HTTPS egress bridge. */
+    DEEPSEEK_PROXY_SECRET: string;
 }
 
 function json(data: unknown, status = 200): Response {
@@ -134,7 +138,7 @@ export default {
             return json({
                 ok: true,
                 // Presence only. The key itself is never returned, logged, or echoed.
-                kimiKeyConfigured: Boolean(env.KIMI_API_KEY),
+                deepseekKeyConfigured: Boolean(env.DEEPSEEK_API_KEY),
                 minimaxKeyConfigured: Boolean(env.MINIMAX_API_KEY),
                 time: new Date().toISOString(),
             });
@@ -169,14 +173,22 @@ export default {
                 perBucket: 6,
             });
 
-            return streamCoachTurn(payload, env.KIMI_API_KEY, {
-                onPlan: async (plan) => {
-                    const checked = await validatePlan(env, plan);
-                    if (!checked.ok) return { ok: false, reason: checked.reason };
-                    await savePlan(env, userID, checked.plan);
-                    return { ok: true, plan: checked.plan };
+            return streamCoachTurn(
+                payload,
+                env.DEEPSEEK_API_KEY,
+                {
+                    onPlan: async (plan) => {
+                        const checked = await validatePlan(env, plan);
+                        if (!checked.ok) return { ok: false, reason: checked.reason };
+                        await savePlan(env, userID, checked.plan);
+                        return { ok: true, plan: checked.plan };
+                    },
                 },
-            });
+                {
+                    endpoint: "http://vance-gateway:8787/internal/deepseek",
+                    internalSecret: env.DEEPSEEK_PROXY_SECRET,
+                }
+            );
         }
 
         // The text coach has already decided what to say. MiniMax only voices

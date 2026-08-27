@@ -96,7 +96,7 @@ open web/index.html
 Redeploy after a change — three static files, nothing to build:
 
 ```bash
-cd worker && npx wrangler pages deploy ../web --project-name=fitness-coach-demo --branch=main
+cd backend/worker && npx wrangler pages deploy ../../web --project-name=fitness-coach-demo --branch=main
 ```
 
 On a desktop it renders inside a phone frame; below 460 px it goes full-bleed.
@@ -113,30 +113,32 @@ and stay zero until real work is logged.
 Speech is the one thing the web build doesn't attempt: the mic replays the next
 scripted turn instead of opening a real recogniser.
 
-## Backend (`worker/`)
+## Backend (`backend/`)
 
-Cloudflare Worker that proxies the model providers. Keys never ship inside the
-app binary. Training records stay local in SwiftData; the exercise catalogue
-and generated plans live in D1 so the same active plan survives a relaunch.
+The Worker handles text coaching and plan generation; the Node Gateway handles
+MiniMax Realtime voice. Keys never ship inside the app binary. Training records
+stay local in SwiftData, while the exercise catalogue and generated plans live
+in D1.
 
 ```bash
-cd worker && npm install && npx wrangler deploy
+cd backend
+cp .env.example .env
+docker compose up
 ```
 
-For a new D1 database, apply `schema.sql`, `seed-exercises.sql`, and
-`seed-names.sql` before deploying the Worker.
+For a local Worker-only loop, use `cd backend/worker && npm install && npx
+wrangler dev`. The full service layout, local app configuration and production
+operational instructions are in [`backend/README.md`](backend/README.md).
 
-Three secrets, set with `wrangler secret put` (never in `wrangler.jsonc`, which
-is public): `KIMI_API_KEY`, `MINIMAX_API_KEY`, and `APP_SHARED_SECRET`.
-
-`KIMI_API_KEY` covers both coaching turns and gym-photo recognition; MiniMax
-covers speech. Coaching runs on `kimi-k2.6` over Moonshot's OpenAI-compatible
-endpoint, so the SSE contract below is the Worker's own — swapping the upstream
-model does not change what the app parses.
+The development/production configuration needs `DEEPSEEK_API_KEY`,
+`MINIMAX_API_KEY`, `KIMI_API_KEY`, `VANCE_WORKER_SECRET`,
+`VANCE_GATEWAY_SECRET`, and `DEEPSEEK_PROXY_SECRET`; copy only the relevant
+two public-path secrets into the untracked iOS `Secrets.xcconfig` as described
+in the backend guide.
 
 | Route | Auth | Purpose |
 | --- | --- | --- |
-| `GET /health` | Bearer | Reports whether the Kimi and MiniMax keys are configured (never their values) |
+| `GET /health` | Bearer | Reports whether the DeepSeek and MiniMax keys are configured (never their values) |
 | `POST /coach/turn` | Bearer | Streams a coaching turn as SSE |
 | `GET /plan?user=…` | Bearer | Returns that install's active generated plan |
 | `POST /plan?user=…` | Bearer | Validates and stores a catalogue-backed plan |
@@ -149,6 +151,32 @@ state), `plan` / `plan_error`, `refusal`, `done`, and `error` events.
 The app executes `adjust_weight`, `swap_exercise`, and `remember` locally.
 `generate_plan` runs on the Worker because both validation and the catalogue
 live there; accepted plans are cached by the app for offline launches.
+
+## Realtime Gateway (`backend/gateway/`)
+
+The workout screen opens an authenticated WebSocket through this small Node
+Gateway. It owns the Vance prompt and provider credentials, reassembles RFC 6455
+continuation frames, and then proxies MiniMax text/audio events. The old
+standalone waveform route is intentionally gone: status, transcript, typed
+context and push-to-talk all live in the strength/cardio coaching screen. The
+Gateway refuses to start without `VANCE_GATEWAY_SHARED_SECRET`; its value is
+configured separately from `COACH_SHARED_SECRET` as `REALTIME_GATEWAY_SECRET`
+in the app.
+
+```bash
+cd backend/gateway
+cp .env.example .env
+npm test
+BIND_HOST=127.0.0.1 PORT=8787 npm start
+```
+
+Debug builds bundle three Mandarin speech fixtures. The `背` / `累` / `弃`
+buttons decode them to 24 kHz PCM16 and pace them through the same authenticated
+WebSocket, commit and MiniMax response path as microphone audio. They are a
+repeatable live integration harness, not scripted coach replies.
+
+For signing, bundle-ID, and physical-network boundaries, see
+[`docs/ios-signing-and-device-testing.md`](docs/ios-signing-and-device-testing.md).
 
 ## Mascot artwork
 
