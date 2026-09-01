@@ -42,6 +42,7 @@ targets:
         COACH_API_HOST: $(COACH_API_HOST)
         COACH_SHARED_SECRET: $(COACH_SHARED_SECRET)
         REALTIME_GATEWAY_HOST: $(REALTIME_GATEWAY_HOST)
+        REALTIME_GATEWAY_SECRET: $(REALTIME_GATEWAY_SECRET)
     configFiles:
       Debug: Secrets.xcconfig
       Release: Secrets.xcconfig

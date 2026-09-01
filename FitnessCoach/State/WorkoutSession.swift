@@ -167,8 +167,10 @@ final class WorkoutSession {
     private static var usesDemoData: Bool {
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("-live") { return false }
-        return arguments.contains("-uitest") || arguments.contains("-onboarded")
-            || arguments.contains("-demo")
+        // `-onboarded` only skips the welcome flow. Treating it as demo mode
+        // also removed CoachAPI, so a normal debug launch could never reach
+        // the LLM or TTS even though valid backend settings were bundled.
+        return arguments.contains("-uitest") || arguments.contains("-demo")
     }
 
     /// A deterministic exercise/context fixture that still uses live services.

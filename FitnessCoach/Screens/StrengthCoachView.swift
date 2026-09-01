@@ -9,7 +9,43 @@ struct StrengthCoachView: View {
     @State private var realtime = RealtimeSession()
     @State private var realtimeDraft = ""
 
+    @ViewBuilder
     var body: some View {
+        if session.exercises.isEmpty {
+            planLoadingView
+        } else {
+            workoutView
+        }
+    }
+
+    /// A DEBUG deep link can render this destination before the asynchronous
+    /// plan sync finishes. Keep that transient state out of `currentExercise`,
+    /// whose progress APIs intentionally require a real exercise.
+    private var planLoadingView: some View {
+        MobileAppShell {
+            PageHeader(
+                title: "力量陪练",
+                style: .navBar,
+                onBack: { path.removeLast() }
+            )
+
+            Spacer()
+            if session.isPlanLoading {
+                ProgressView("正在加载训练计划…")
+                    .font(Theme.body)
+                    .foregroundStyle(Theme.secondaryText)
+            } else {
+                ContentUnavailableView(
+                    "还没有可用计划",
+                    systemImage: "list.bullet.clipboard",
+                    description: Text("先回到我的计划生成今天的训练，再进入力量陪练。")
+                )
+            }
+            Spacer()
+        }
+    }
+
+    private var workoutView: some View {
         MobileAppShell {
             PageHeader(
                 title: "力量陪练",

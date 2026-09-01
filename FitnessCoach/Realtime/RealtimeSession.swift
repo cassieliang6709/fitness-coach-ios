@@ -607,10 +607,16 @@ final class RealtimeSession {
     static func gatewayRequest(conversationId: String) -> URLRequest? {
         guard let url = gatewayURL(conversationId: conversationId) else { return nil }
         var request = URLRequest(url: url)
-        let secret =
-            (Bundle.main.infoDictionary?["REALTIME_GATEWAY_SECRET"] as? String)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !secret.isEmpty, !secret.contains("$(") {
+        let secret = ["REALTIME_GATEWAY_SECRET", "COACH_SHARED_SECRET"].compactMap {
+            (key: String) -> String? in
+            guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String else {
+                return nil
+            }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, !trimmed.contains("$(") else { return nil }
+            return trimmed
+        }.first
+        if let secret {
             request.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
         }
         return request

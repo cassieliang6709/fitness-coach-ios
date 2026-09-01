@@ -39,6 +39,8 @@
 	<string>把你说的话转成文字发给 AI 教练。识别在设备上完成。</string>
 	<key>REALTIME_GATEWAY_HOST</key>
 	<string>$(REALTIME_GATEWAY_HOST)</string>
+	<key>REALTIME_GATEWAY_SECRET</key>
+	<string>$(REALTIME_GATEWAY_SECRET)</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

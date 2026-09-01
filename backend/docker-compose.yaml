@@ -20,6 +20,9 @@ services:
     environment:
       # 把 .env 里的 VANCE_WORKER_SECRET 映射成 worker 代码期望的 APP_SHARED_SECRET
       APP_SHARED_SECRET: ${VANCE_WORKER_SECRET}
+      # Keep the VPS Worker on the private egress bridge; Cloudflare uses its
+      # direct DeepSeek path because this URL is not configured there.
+      DEEPSEEK_PROXY_URL: http://vance-gateway:8787/internal/deepseek
       DEEPSEEK_PROXY_SECRET: ${DEEPSEEK_PROXY_SECRET}
       # Wrangler only maps container process variables into the Worker when
       # this is explicit. No .env file is copied into the image.

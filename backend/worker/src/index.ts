@@ -33,8 +33,10 @@ export interface Env {
     KIMI_API_KEY: string;
     /** MiniMax speech key. Set via: wrangler secret put MINIMAX_API_KEY */
     MINIMAX_API_KEY: string;
-    /** Private gateway-only credential for the Node HTTPS egress bridge. */
-    DEEPSEEK_PROXY_SECRET: string;
+    /** Optional private gateway-only credential for the Node HTTPS egress bridge. */
+    DEEPSEEK_PROXY_SECRET?: string;
+    /** Optional proxy URL. When unset, the Worker calls DeepSeek directly. */
+    DEEPSEEK_PROXY_URL?: string;
 }
 
 function json(data: unknown, status = 200): Response {
@@ -162,6 +164,15 @@ export default {
             const invalid = validate(payload);
             if (invalid) return json({ error: "invalid_request", detail: invalid }, 400);
 
+            const proxyURL = env.DEEPSEEK_PROXY_URL?.trim();
+            const proxySecret = env.DEEPSEEK_PROXY_SECRET?.trim();
+            if (proxyURL && !proxySecret) {
+                return json({ error: "deepseek_proxy_not_configured" }, 503);
+            }
+            if (!proxyURL && !env.DEEPSEEK_API_KEY?.trim()) {
+                return json({ error: "deepseek_not_configured" }, 503);
+            }
+
             const userID = url.searchParams.get("user") ?? "demo";
             await ensureUser(env, userID);
 
@@ -184,10 +195,12 @@ export default {
                         return { ok: true, plan: checked.plan };
                     },
                 },
-                {
-                    endpoint: "http://vance-gateway:8787/internal/deepseek",
-                    internalSecret: env.DEEPSEEK_PROXY_SECRET,
-                }
+                proxyURL
+                    ? {
+                        endpoint: proxyURL,
+                        internalSecret: proxySecret,
+                    }
+                    : undefined
             );
         }
 

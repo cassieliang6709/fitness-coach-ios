@@ -12,6 +12,20 @@ seven-day interactive gym-learning course:
                  → /lab/1 … /lab/6 → /lab/final → /lab/license
 ```
 
+## Vance v2 direction
+
+Vance v2 narrows the product around one execution loop:
+`prepare → execute → adapt → review → improve`. The current typed coaching
+actions will become a thin, replayable Agent Harness, followed by a simulated
+workout benchmark and offline Agentic RL experiments. Safety rules, state
+transitions, authorization, and persistence remain deterministic.
+
+- Product, harness, reward, evaluation, and rollout spec:
+  [`docs/vance-v2-agent-harness-rl-spec.md`](docs/vance-v2-agent-harness-rl-spec.md)
+
+The harness is deliberately domain-specific; this project is not trying to
+become a general-purpose agent framework.
+
 `/welcome` runs once, for a user with no stored profile. Its four questions
 (目标 / 场地 / 身体状况 / AI 风格) are written straight into the memory table, so
 the coach's first line already reflects them.
