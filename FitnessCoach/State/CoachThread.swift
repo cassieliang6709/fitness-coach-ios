@@ -48,6 +48,9 @@ final class CoachThread {
     private let script: [ScriptedTurn]
     private var usedTurns: Set<String> = []
     private var work: Task<Void, Never>?
+    /// Identifies the most recently queued turn so a finishing one only clears
+    /// `work` when nothing has lined up behind it. See `enqueue`.
+    private var generation = 0
     private let onEffect: (TurnEffect) -> Void
     private let speaker = CoachSpeechPlayer()
 
@@ -96,19 +99,38 @@ final class CoachThread {
 
     func startIfNeeded() {
         guard messages.isEmpty, work == nil else { return }
-        work = Task { [opening] in
-            await deliver(opening)
-            work = nil
-        }
+        enqueue { await self.deliver(self.opening) }
     }
 
     /// Coach speaks unprompted — used when the session moves to a new movement.
     func announce(_ line: CoachLine) {
+        enqueue { await self.deliver([line]) }
+    }
+
+    /// Runs a coach turn after whatever is already speaking, rather than
+    /// refusing because the thread is busy.
+    ///
+    /// Refusing is what broke every cold start: the opening line and the plan
+    /// sync are started by two different views — `HomeView.onAppear` and
+    /// `RootView.task` — so which one lands first is decided by the network.
+    /// A plan request that arrived while the greeting was still typing was
+    /// dropped with "教练正在回复" and never retried, leaving the plan tab on
+    /// "还没有可用计划" permanently.
+    ///
+    /// The generation token is load-bearing. A finished turn clears `work`, and
+    /// without the token it would clear the registration belonging to whatever
+    /// queued up behind it — after which the `work == nil` guards would happily
+    /// start a second turn on top of the one still running.
+    private func enqueue(_ body: @escaping () async -> Void) {
         let previous = work
+        generation &+= 1
+        let mine = generation
         work = Task {
+            // Awaiting a non-throwing task ignores our own cancellation, so
+            // re-check before doing the work the user may have just cancelled.
             _ = await previous?.value
-            await deliver([line])
-            finishWork()
+            if !Task.isCancelled { await body() }
+            if generation == mine { work = nil }
         }
     }
 
@@ -276,12 +298,10 @@ final class CoachThread {
     /// a plan disappeared, and the page just said "还没有可用计划".
     func requestPlan(replacingCurrent: Bool) {
         guard isLive else { return }
-        guard !isBusy, work == nil else {
-            let busy = "教练正在回复，稍等一下再生成"
-            report(busy)
-            planFailure = busy
-            return
-        }
+        // Only a second plan request is refused. Anything else in flight — on a
+        // cold start, almost always the opening line — is something to wait for,
+        // not a reason to abandon the plan.
+        guard !isGeneratingPlan else { return }
 
         voiceNotice = nil
         clearError()
@@ -293,13 +313,12 @@ final class CoachThread {
             ? "请根据我的目标、场地和身体状况，直接换一份不同的今日训练计划。"
             : "请根据我的目标、场地和身体状况，直接生成今天的训练计划。"
 
-        work = Task {
-            await runLiveTurn(userText: prompt)
+        enqueue {
+            await self.runLiveTurn(userText: prompt)
             // A turn that answered with a question rather than a plan is not a
             // failure — the reply is on screen. Only a real error carries over.
-            planFailure = lastError
-            isGeneratingPlan = false
-            finishWork()
+            self.planFailure = self.lastError
+            self.isGeneratingPlan = false
         }
     }
 
@@ -338,6 +357,10 @@ final class CoachThread {
         work = nil
         voiceState = .idle
         isTyping = false
+        // A plan turn still waiting its place in the queue will never run now.
+        // Leaving this set would spin the plan tab forever and, because
+        // `syncPlan` skips while `isPlanLoading`, block every later attempt.
+        isGeneratingPlan = false
     }
 
     /// Text path: the user's own words, then the next scripted coach reply.
