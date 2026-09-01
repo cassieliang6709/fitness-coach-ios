@@ -627,6 +627,11 @@ final class CoachThread {
     /// TTS is best-effort: a speech outage must never erase or fail a text
     /// reply the user already received. Cancelling the turn stops playback.
     private func speak(_ text: String) async {
+        // Checked here rather than at the call sites so no reply can slip past:
+        // the opening line, refusals and post-tool summaries all funnel through
+        // this one method. Muted means the request is never made, not that the
+        // audio is fetched and thrown away.
+        guard VoiceOutput.isEnabled else { return CoachLog.voice.info("skip: muted") }
         guard api != nil else { return CoachLog.voice.info("skip: no api") }
         guard !text.isEmpty else { return CoachLog.voice.info("skip: empty text") }
         guard !Task.isCancelled else { return CoachLog.voice.info("skip: cancelled before") }

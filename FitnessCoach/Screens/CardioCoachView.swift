@@ -8,6 +8,7 @@ struct CardioCoachView: View {
     @State private var confirmEnd = false
     @State private var realtime = RealtimeSession()
     @State private var realtimeDraft = ""
+    @AppStorage(VoiceOutput.key) private var voiceEnabled = false
 
     var body: some View {
         MobileAppShell {
@@ -15,7 +16,9 @@ struct CardioCoachView: View {
                 title: "有氧陪练",
                 style: .navBar,
                 onBack: { path.removeLast() }
-            )
+            ) {
+                VoiceToggleButton()
+            }
 
             // Same sticky task card component as the strength page.
             CurrentTaskCard(
@@ -43,7 +46,7 @@ struct CardioCoachView: View {
                 .frame(maxHeight: .infinity)
                 .layoutPriority(1)
             } else {
-                RealtimeCoachPanel(session: realtime)
+                RealtimeCoachPanel(session: realtime, isMuted: !voiceEnabled)
             }
         } bottom: {
             if session.phase == .cardioComplete {
@@ -61,7 +64,11 @@ struct CardioCoachView: View {
             } else {
                 BottomBar {
                     VStack(spacing: 10) {
-                        RealtimeCoachControls(session: realtime, draft: $realtimeDraft)
+                        RealtimeCoachControls(
+                            session: realtime,
+                            draft: $realtimeDraft,
+                            isMuted: !voiceEnabled
+                        )
                         Button("结束训练") { confirmEnd = true }
                             .font(Theme.caption)
                             .foregroundStyle(Theme.secondaryText)
@@ -74,11 +81,21 @@ struct CardioCoachView: View {
             session.enterCardio()
             guard !session.usesDemoData else { return }
             configureRealtime()
-            realtime.connect()
+            // Muted: no socket, no microphone, no MiniMax session.
+            if voiceEnabled { realtime.connect() }
         }
         .onChange(of: session.realtimeCoachContext) {
             guard !session.usesDemoData else { return }
             configureRealtime()
+        }
+        .onChange(of: voiceEnabled) {
+            guard !session.usesDemoData else { return }
+            if voiceEnabled {
+                configureRealtime()
+                realtime.connect()
+            } else {
+                realtime.disconnect()
+            }
         }
         .onDisappear { realtime.disconnect() }
         .confirmationDialog("结束本次训练？", isPresented: $confirmEnd, titleVisibility: .visible) {

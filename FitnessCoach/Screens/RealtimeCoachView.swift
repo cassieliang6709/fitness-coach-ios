@@ -5,6 +5,10 @@ import SwiftUI
 /// exercise card and the coach's spoken guidance belong in one place.
 struct RealtimeCoachPanel: View {
     let session: RealtimeSession
+    /// Voice is switched off app-wide, so there is no socket and no microphone.
+    /// Shown rather than hidden: an idle panel with a dead talk button reads as
+    /// a broken connection unless it says the user turned it off.
+    var isMuted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -12,7 +16,7 @@ struct RealtimeCoachPanel: View {
                 .padding(.horizontal, Theme.pagePadding)
                 .padding(.bottom, 12)
 
-            if let issue = session.microphoneIssue {
+            if let issue = session.microphoneIssue, !isMuted {
                 Label(issue, systemImage: "mic.slash")
                     .font(Theme.caption)
                     .foregroundStyle(Theme.secondaryText)
@@ -33,7 +37,7 @@ struct RealtimeCoachPanel: View {
                 .fill(statusColor)
                 .frame(width: 8, height: 8)
 
-            Text(session.status.label)
+            Text(isMuted ? "语音已静音" : session.status.label)
                 .font(Theme.caption)
                 .foregroundStyle(Theme.secondaryText)
                 .lineLimit(2)
@@ -41,14 +45,15 @@ struct RealtimeCoachPanel: View {
 
             Spacer(minLength: 8)
 
-            if let latency = session.lastLatencyMs {
+            if let latency = session.lastLatencyMs, !isMuted {
                 Text("\(latency) ms")
                     .font(Theme.caption)
                     .foregroundStyle(Theme.secondaryText)
                     .monospacedDigit()
             }
 
-            if case .failed = session.status {
+            // A retry can't succeed while muted — the toggle is the fix.
+            if case .failed = session.status, !isMuted {
                 Button("重连") { session.retry() }
                     .font(Theme.caption)
                     .foregroundStyle(Theme.primary)
@@ -62,6 +67,7 @@ struct RealtimeCoachPanel: View {
     }
 
     private var statusColor: Color {
+        guard !isMuted else { return Theme.secondaryText }
         switch session.status {
         case .idle, .connecting: return Theme.secondaryText
         case .ready: return Theme.success
@@ -76,10 +82,14 @@ struct RealtimeCoachPanel: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     if session.messages.isEmpty {
-                        Text("按住下方按钮说话，教练会结合当前动作实时回应。")
-                            .font(Theme.body)
-                            .foregroundStyle(Theme.secondaryText)
-                            .padding(.top, 24)
+                        Text(
+                            isMuted
+                                ? "语音陪练关着。点右上角的喇叭开启，教练才会开始听和说。"
+                                : "按住下方按钮说话，教练会结合当前动作实时回应。"
+                        )
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.secondaryText)
+                        .padding(.top, 24)
                     }
 
                     ForEach(session.messages) { message in
@@ -112,6 +122,7 @@ struct RealtimeCoachPanel: View {
 struct RealtimeCoachControls: View {
     let session: RealtimeSession
     @Binding var draft: String
+    var isMuted = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -196,9 +207,9 @@ struct RealtimeCoachControls: View {
         let isTalking = session.status == .listening
 
         return HStack(spacing: 10) {
-            Image(systemName: isTalking ? "waveform" : "mic.fill")
+            Image(systemName: isMuted ? "speaker.slash.fill" : (isTalking ? "waveform" : "mic.fill"))
                 .font(.system(size: 17, weight: .semibold))
-            Text(isTalking ? "松开发送" : "按住说话")
+            Text(isMuted ? "语音已静音" : (isTalking ? "松开发送" : "按住说话"))
                 .font(.system(size: 17, weight: .semibold))
         }
         .foregroundStyle(.white)
@@ -220,7 +231,7 @@ struct RealtimeCoachControls: View {
                     session.endSpeaking()
                 }
         )
-        .disabled(!session.status.isConnected)
-        .accessibilityLabel("按住说话")
+        .disabled(isMuted || !session.status.isConnected)
+        .accessibilityLabel(isMuted ? "语音已静音" : "按住说话")
     }
 }

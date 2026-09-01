@@ -37,7 +37,10 @@ struct HomeView: View {
                 LabHomeView(path: $path)
             } else {
                 PageHeader(title: headerTitle, subtitle: subtitle) {
-                    Mascot(pose: headerPose, size: 42)
+                    HStack(spacing: 6) {
+                        VoiceToggleButton()
+                        Mascot(pose: headerPose, size: 42)
+                    }
                 }
 
                 switch tab {
