@@ -41,16 +41,6 @@ final class WorkoutFlowUITests: XCTestCase {
 
     // MARK: - Exercise library
 
-    func testRiveLabSwitchesTheCharacterStateMachineInput() {
-        let app = launch(route: "/rive-lab")
-
-        XCTAssertTrue(app.staticTexts["Rive 动作实验"].waitForExistence(timeout: 6))
-        XCTAssertTrue(app.staticTexts["当前状态：Beginner"].exists)
-
-        app.buttons["rive-level-expert"].tap()
-        XCTAssertTrue(app.staticTexts["当前状态：Expert"].waitForExistence(timeout: 3))
-    }
-
     func testExerciseLibraryFiltersKneeContraindicationsBeforeSearch() {
         let app = launch(route: "/exercises")
 

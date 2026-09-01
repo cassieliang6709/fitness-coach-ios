@@ -6,19 +6,12 @@ options:
   createIntermediateGroups: true
   groupSortPosition: top
 
-packages:
-  RiveRuntime:
-    url: https://github.com/rive-app/rive-ios
-    exactVersion: 6.20.1
-
 targets:
   FitnessCoach:
     type: application
     platform: iOS
     sources:
       - path: FitnessCoach
-    dependencies:
-      - package: RiveRuntime
     info:
       path: FitnessCoach/Info.plist
       properties:
