@@ -60,6 +60,7 @@ struct LabHomeView: View {
         }
         .scrollIndicators(.hidden)
         .background(Theme.labBackground)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("lab-home")
     }
 

@@ -80,6 +80,7 @@ struct LabLessonView: View {
         .background(Theme.labBackground)
         .onAppear(perform: restore)
         .onChange(of: stepIndex) { _, _ in restoreChoice() }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("lab-lesson-\(day)")
     }
 
