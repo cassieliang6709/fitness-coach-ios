@@ -15,6 +15,13 @@
  */
 
 import { activePlan, equipmentFromMemories, savePlan, shortlist, validatePlan } from "./plan";
+import {
+    COACH_IDENTITY,
+    DELIVERY_RULES,
+    PLAN_RULES,
+    renderMemories,
+    SAFETY_RULES,
+} from "./prompt";
 import type { Env as PlanEnv, PlanInput } from "./plan";
 
 // A Worker opens an outbound WebSocket with an HTTPS fetch plus Upgrade.
@@ -26,23 +33,15 @@ export interface RealtimeEnv extends PlanEnv {
     MINIMAX_API_KEY: string;
 }
 
-const COACH_INSTRUCTIONS = `你是一个健身陪练 Agent，正在和用户语音对话。
+const COACH_INSTRUCTIONS = `${COACH_IDENTITY}，正在和用户语音对话。
 
-说话规则：
-- 这是语音，不是文字。每次只说一到两句话，说人话，不要念稿。
-- 不要用 Markdown、列表、编号。
-- 直接说下一步做什么，不要复述用户刚说的话。
-- 不要提心率、卡路里、补水这些和当前动作无关的东西。
+这是语音，不是文字。说人话，不要念稿，不要用编号。
 
-安全规则：
-- 用户报告疼痛或不适时，先降负荷或换动作，再继续。
-- 涉及疼痛、受伤、用药、疾病时，说明你不是医疗人员，建议就医，不要诊断。
-- 记忆里的伤病信息优先于计划。
+${DELIVERY_RULES}
 
-计划规则：
-- 用户问今天练什么、要计划、想换计划时，立刻调用 generate_plan。
-  不要先反问"练多久"——先给一版完整的，用户不满意会说要改。
-- exercise_id 只能从工具描述里那份清单里复制，绝不自己编动作。`;
+${SAFETY_RULES}
+
+${PLAN_RULES}`;
 
 /** Tool schema in the realtime API's function-calling shape. */
 function planFunction(catalogue: string) {
@@ -140,10 +139,7 @@ export async function openRealtime(
         session: {
             modalities: ["text", "audio"],
             instructions:
-                `${COACH_INSTRUCTIONS}\n\n` +
-                (memories.length
-                    ? `关于这个用户你已经记住的：\n${memories.map((m) => `- ${m}`).join("\n")}`
-                    : "关于这个用户暂无长期记忆。"),
+                `${COACH_INSTRUCTIONS}\n\n${renderMemories(memories)}`,
             input_audio_format: "pcm16",
             output_audio_format: "pcm16",
             input_audio_transcription: { model: "asr-01" },
