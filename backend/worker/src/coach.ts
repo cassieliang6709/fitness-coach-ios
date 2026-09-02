@@ -375,6 +375,16 @@ export function streamCoachTurn(
                 });
                 controller.close();
             } catch (error) {
+                // Without this the upstream cause never leaves the isolate: the
+                // client sees an opaque `internal_error` and the tail shows a
+                // successful invocation with no exception. Log the message and
+                // stack only — the request body carries the user's plan and the
+                // headers carry the shared secret.
+                console.error(
+                    "coach turn failed:",
+                    error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+                    error instanceof Error ? error.stack : undefined
+                );
                 send("error", { status: 500, message: "internal_error" });
                 controller.close();
             }
