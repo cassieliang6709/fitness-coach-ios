@@ -179,7 +179,20 @@ enum CoachAPIError: LocalizedError {
         switch self {
         case .notConfigured: return "教练服务未配置"
         case .http(let status): return "服务返回 \(status)"
-        case .upstream(let reason): return "上游错误：\(reason)"
+        case .upstream(let reason): return Self.upstreamMessage(reason)
+        }
+    }
+
+    /// The reasons the Worker can actually send are worth saying in the user's
+    /// own words — "上游错误：reply_truncated" tells them nothing they can act on.
+    /// Anything unrecognised still surfaces raw rather than being swallowed.
+    private static func upstreamMessage(_ reason: String) -> String {
+        switch reason {
+        case "reply_truncated": return "教练这轮想得太久，没说完。再试一次。"
+        case "empty_reply": return "教练这轮没给出回复。再试一次。"
+        case "upstream_error": return "模型服务暂时不可用，稍后再试。"
+        case "internal_error": return "教练服务出错了，稍后再试。"
+        default: return "上游错误：\(reason)"
         }
     }
 }

@@ -500,7 +500,17 @@ final class CoachThread {
         var assistantBlocks: [WireBlock] = []
         if !streamed.isEmpty { assistantBlocks.append(.text(streamed)) }
         assistantBlocks.append(contentsOf: toolUses)
-        guard !assistantBlocks.isEmpty else { return }
+        // No text, no tool call, no plan, and no error either. This used to
+        // return quietly, which put the user's own bubble on screen next to
+        // nothing at all — no reply, no spinner, no way to try again. The
+        // Worker now reports the truncated turns that caused it, but a coach
+        // who answers with silence has to be visible whatever the cause.
+        guard !assistantBlocks.isEmpty else {
+            CoachLog.thread.error("turn produced nothing")
+            report("教练这轮没有回复。再试一次。", retrying: userText)
+            if wire.last?.role == "user" { wire.removeLast() }
+            return
+        }
         wire.append(WireMessage(role: "assistant", content: assistantBlocks))
 
         // Every tool_use must be answered before the next user turn, so close
