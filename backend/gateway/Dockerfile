@@ -7,7 +7,7 @@ COPY package.json ./
 # 无第三方依赖，跳过 npm install
 
 # 拷贝源码
-COPY server.mjs coach-prompt.mjs gym-vision.mjs telemetry.mjs websocket-frames.mjs ./
+COPY server.mjs coach-prompt.mjs telemetry.mjs websocket-frames.mjs ./
 
 EXPOSE 8787
 
