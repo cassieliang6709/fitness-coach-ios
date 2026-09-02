@@ -31,4 +31,4 @@ landing/.vercel/
 worker/.app-secret
 worker/node_modules/
 
-worker/.wrangler/
+.wrangler/
