@@ -276,7 +276,34 @@ export function streamCoachTurn(
                         model: DEEPSEEK_MODEL,
                         messages,
                         tools,
-                        max_tokens: 1024,
+                        // `deepseek-v4-flash` thinks by default, and thinking
+                        // mode broke this endpoint in two separate ways.
+                        //
+                        // The chain of thought is billed against `max_tokens`
+                        // and comes back in `reasoning_content`, which we never
+                        // forward. At the old cap of 1024 the reasoning alone
+                        // routinely spent the entire budget, so the turn ended
+                        // `finish_reason: "length"` with an empty `content` and
+                        // no `tool_calls` — roughly one turn in three answered
+                        // with nothing at all.
+                        //
+                        // Worse, DeepSeek requires `reasoning_content` to be
+                        // replayed on any later turn that follows a tool call.
+                        // We rebuild the history from the client's messages, so
+                        // it is not there, and the second leg of every tool turn
+                        // came back 400. Keeping it would mean streaming the
+                        // model's private reasoning to the phone and storing it
+                        // in the conversation just to hand it back.
+                        //
+                        // A coach who answers in one or two sentences while the
+                        // user stands at a rack does not need deliberation; it
+                        // needs to be quick. Turning it off costs nothing here
+                        // and removes both failures at once.
+                        thinking: { type: "disabled" },
+                        // Still generous: a full plan is six exercises of tool
+                        // arguments, and truncating one is what produced the
+                        // silent turns above.
+                        max_tokens: 4096,
                         stream: false,
                     }),
                 });
@@ -299,6 +326,30 @@ export function streamCoachTurn(
                 const result = await response.json() as any;
                 const choice = result.choices?.[0];
                 const replyText = choice?.message?.content ?? "";
+                const toolCalls = choice?.message?.tool_calls ?? [];
+
+                // A turn has to end with something the user can see. When it
+                // doesn't, say so — the alternative is the bare `done` below,
+                // which the client cannot tell apart from a coach who chose to
+                // stay quiet, so the message just vanished off the screen.
+                if (!replyText && toolCalls.length === 0) {
+                    console.error(
+                        "coach turn produced nothing:",
+                        JSON.stringify({
+                            finish_reason: choice?.finish_reason,
+                            usage: result.usage,
+                        })
+                    );
+                    send("error", {
+                        status: 502,
+                        message:
+                            choice?.finish_reason === "length"
+                                ? "reply_truncated"
+                                : "empty_reply",
+                    });
+                    controller.close();
+                    return;
+                }
 
                 // Stream the text in chunks
                 if (replyText) {
@@ -309,7 +360,6 @@ export function streamCoachTurn(
                 }
 
                 // Handle tool calls
-                const toolCalls = choice?.message?.tool_calls ?? [];
                 for (const tc of toolCalls) {
                     const name = tc.function?.name;
                     let input: any = {};
