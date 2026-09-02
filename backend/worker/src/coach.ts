@@ -282,7 +282,15 @@ export function streamCoachTurn(
                 });
 
                 if (!response.ok) {
-                    const errText = await response.text();
+                    // The body was already being read and then dropped, so an
+                    // upstream refusal — a bad key, a rate limit, a rejected
+                    // request shape — reached us as a bare status and nothing
+                    // else. It is the model's error text, not the user's data.
+                    const detail = await response.text();
+                    console.error(
+                        `coach upstream ${response.status}:`,
+                        detail.slice(0, 1000)
+                    );
                     send("error", { status: response.status, message: "upstream_error" });
                     controller.close();
                     return;
