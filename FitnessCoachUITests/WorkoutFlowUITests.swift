@@ -45,7 +45,7 @@ final class WorkoutFlowUITests: XCTestCase {
         let app = launch(route: "/exercises")
 
         XCTAssertTrue(app.staticTexts["动作库"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["34 个适合你 · 完整库 50 个"].exists)
+        XCTAssertTrue(app.staticTexts["离线精选 · 34 / 50 个适合当前设置"].exists)
         XCTAssertTrue(app.staticTexts["猫牛式"].exists)
 
         // The demo profile has a knee condition. Searching cannot bring a
@@ -97,7 +97,7 @@ final class WorkoutFlowUITests: XCTestCase {
     func testWelcomeFlowSeedsMemoriesAndLandsOnHome() {
         let app = launch(onboarded: false)
 
-        XCTAssertTrue(app.staticTexts["先认识一下"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Vance - 健身搭子"].waitForExistence(timeout: 5))
         app.buttons["继续"].tap()
 
         XCTAssertTrue(app.staticTexts["你想练成什么样？"].waitForExistence(timeout: 3))
@@ -134,7 +134,7 @@ final class WorkoutFlowUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons["对话"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["我的计划"].exists)
-        XCTAssertFalse(app.staticTexts["先认识一下"].exists)
+        XCTAssertFalse(app.staticTexts["Vance - 健身搭子"].exists)
     }
 
     // MARK: - Home tabs
@@ -190,7 +190,7 @@ final class WorkoutFlowUITests: XCTestCase {
         let app = launch()
 
         app.buttons["实验室"].waitAndTap()
-        XCTAssertTrue(app.otherElements["lab-home"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.scrollViews["lab-home"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["先决定你在练什么"].exists)
 
         app.buttons["开始今天的实验"].waitAndTap()
@@ -457,7 +457,7 @@ final class WorkoutFlowUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["跑步机快走"].waitForExistence(timeout: 5))
         // Cardio now runs on a real clock, so it starts at zero.
-        XCTAssertTrue(app.staticTexts["已完成 0 / 30 分钟"].exists)
+        XCTAssertTrue(app.staticTexts["已完成 0 / 20 分钟"].exists)
 
         app.buttons["完成有氧"].waitAndTap()
         let toReview = app.buttons["有氧完成，查看复盘"]
@@ -498,7 +498,7 @@ final class WorkoutFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["2 / 4 组 · 12 次"].exists)
         XCTAssertTrue(app.staticTexts["0 / 4 组 · 15 次"].exists, "臀桥 was never started")
         XCTAssertTrue(app.staticTexts["0 / 3 组 · 15 次"].exists, "小腿提踵 was never started")
-        XCTAssertTrue(app.staticTexts["0 / 30 分钟"].exists, "cardio never happened")
+        XCTAssertTrue(app.staticTexts["0 / 20 分钟"].exists, "cardio never happened")
     }
 
     // MARK: - Memory persists across launches
