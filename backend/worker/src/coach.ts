@@ -54,7 +54,7 @@ export interface CoachRequest {
 /**
  * Stable across every request, so it sits first in `system`. Anything that
  * changes mid-session (current set, weight, memories) is appended as a second
- * block — see buildSystem.
+ * block — see buildSystemText.
  */
 const BASE_SYSTEM = `${COACH_IDENTITY}，在用户训练过程中实时指导。
 
@@ -207,30 +207,6 @@ function describeState(
     );
 
     return lines.join("\n");
-}
-
-/**
- * Two system blocks: the stable persona (cacheable) then the live state.
- *
- * On Opus 5 the live state would ride as a mid-conversation system message to
- * keep the cached prefix byte-identical — but that feature is Opus-5/4.8 only
- * and returns 400 on Haiku, so it goes in `system` here instead.
- */
-function buildSystem(request: CoachRequest): Anthropic.TextBlockParam[] {
-    return [
-        {
-            type: "text",
-            text: `${BASE_SYSTEM}\n\n语气：${STYLE_INSTRUCTIONS[request.style]}`,
-            // Haiku 4.5 needs a 4096-token prefix before anything caches, and
-            // this prompt is far shorter — so this is currently a no-op kept
-            // for when the prompt grows or the model changes.
-            cache_control: { type: "ephemeral" },
-        },
-        {
-            type: "text",
-            text: describeState(request.state, request.memories, request.history),
-        },
-    ];
 }
 
 // MARK: - SSE
