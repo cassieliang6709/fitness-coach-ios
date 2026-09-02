@@ -176,10 +176,16 @@ export default {
             const userID = url.searchParams.get("user") ?? "demo";
             await ensureUser(env, userID);
 
+            // `validate` deliberately lets `memories` be absent, but the prompt
+            // builder reads its length unconditionally. Normalise once here so
+            // the field is a real array everywhere downstream rather than
+            // guarded at each use and missed at one of them.
+            payload.memories ??= [];
+
             // Give the model real movements to pick from, filtered by what the
             // gym actually has according to the user's equipment memories.
             payload.shortlist = await shortlist(env, {
-                equipment: equipmentFromMemories(payload.memories ?? []),
+                equipment: equipmentFromMemories(payload.memories),
                 bodyParts: ["upper legs", "chest", "back", "shoulders", "waist", "cardio"],
                 perBucket: 6,
             });
