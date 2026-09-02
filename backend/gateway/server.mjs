@@ -116,7 +116,11 @@ async function handleRequest(request, response) {
 }
 
 function authorized(request) {
-  if (!sharedSecret) return true;
+  // No `if (!sharedSecret) return true` here. Startup already exits when the
+  // secret is missing, so that branch was unreachable — but it read as a
+  // sanctioned way to run open, and it pointed the opposite way to
+  // `internalAuthorized` below. If the startup guard is ever relaxed, this
+  // must keep failing closed.
   const header = request.headers.authorization || '';
   const candidate = header.startsWith('Bearer ') ? header.slice(7) : '';
   const expected = Buffer.from(sharedSecret);
